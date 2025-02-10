@@ -1,4 +1,12 @@
 #!/bin/sh
-export MOUNTED_DIR=${MOUNTED_DIR:-/app/config}
-exec gunicorn -w 4 -b 0.0.0.0:${HOST_PORT:-8000} wsgi:app &
-cd ZeroNet-master && exec python zeronet.py --ui_ip 0.0.0.0
+
+# Wait for any dependent services to start
+sleep 5
+
+# Start ZeroNet in the background
+cd /app/ZeroNet
+./ZeroNet.sh --ui_ip '*' &
+
+# Run the Flask application with Gunicorn
+cd /app
+exec gunicorn --bind 0.0.0.0:8000 --workers 3 wsgi:app
