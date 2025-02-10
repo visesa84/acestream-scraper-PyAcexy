@@ -1,6 +1,6 @@
-# Acestream Scrapper
+# Acestream Scraper
 
-Acestream Scrapper is a Python-based web scraping application that retrieves Acestream channel information and generates M3U playlists. The application is built using Flask, BeautifulSoup, SQLAlchemy, and can be run locally or inside a Docker container.
+Acestream Scraper is a Python-based web scraping application that retrieves Acestream channel information and generates M3U playlists. The application is built using Flask, BeautifulSoup, SQLAlchemy, and can be run locally or inside a Docker container.
 
 ## Features
 
@@ -22,8 +22,8 @@ Acestream Scrapper is a Python-based web scraping application that retrieves Ace
 1. **Clone the repository:**
 
     ```bash
-    git clone https://github.com/yourusername/acestream-scrapper.git
-    cd acestream-scrapper
+    git clone https://github.com/yourusername/acestream-scraper.git
+    cd acestream-scraper
     ```
 
 2. **Create and activate a virtual environment:**
@@ -70,7 +70,7 @@ Acestream Scrapper is a Python-based web scraping application that retrieves Ace
 
 ### Access the Web Interface
 
-Open your web browser and navigate to `http://localhost:8000` to access the Acestream Scrapper web interface. You can view the channel metadata and add new URLs for scraping.
+Open your web browser and navigate to `http://localhost:8000` to access the Acestream Scraper web interface. You can view the channel metadata and add new URLs for scraping.
 
 ### Retrieve M3U Playlist
 
@@ -91,18 +91,18 @@ Open your web browser and navigate to `http://localhost:8000` to access the Aces
 1. **Build the Docker image:**
 
     ```bash
-    docker build -t acestream-scrapper .
+    docker build -t acestream-scraper .
     ```
 
 2. **Run the Docker container, mounting the user-provided directory to `/app/config`:**
 
     ```bash
-    docker run -p 8000:8000 -e HOST_PORT=8000 -v /path/to/your/config:/app/config acestream-scrapper
+    docker run -p 8000:8000 -p 43110:43110 --name acestream-scraper-container -v /path/to/your/config:/app/config acestream-scraper
     ```
 
-# Docker Setup for Acestream Scrapper
+# Docker Setup for Acestream Scraper
 
-This document provides an overview of the required and optional variables and paths for setting up the Acestream Scrapper application using Docker. Follow these instructions to ensure a smooth setup experience.
+This document provides an overview of the required and optional variables and paths for setting up the Acestream Scraper application using Docker. Follow these instructions to ensure a smooth setup experience.
 
 ## Required Variables and Paths
 
@@ -113,7 +113,7 @@ This document provides an overview of the required and optional variables and pa
 - **Usage:** This environment variable specifies the port on which the Flask application will listen for incoming requests. You can change it by setting the `HOST_PORT` environment variable when running the Docker container.
 
     ```bash
-    docker run -p <your_host_port>:<HOST_PORT> -e HOST_PORT=<HOST_PORT> -v /path/to/your/config:/app/config acestream-scrapper
+    docker run -p <your_host_port>:<HOST_PORT> -e HOST_PORT=<HOST_PORT> -v /path/to/your/config:/app/config acestream-scraper
     ```
 
 ### /app/config
@@ -122,7 +122,7 @@ This document provides an overview of the required and optional variables and pa
 - **Usage:** You need to map a local directory containing the configuration and database files to `/app/config` inside the Docker container.
 
     ```bash
-    docker run -p 8000:8000 -e HOST_PORT=8000 -v /path/to/your/config:/app/config acestream-scrapper
+    docker run -p 8000:8000 -p 43110:43110 --name acestream-scraper-container -v /path/to/your/config:/app/config acestream-scraper
     ```
 
 - **Directory Structure:**
@@ -158,7 +158,7 @@ This document provides an overview of the required and optional variables and pa
 
 ### Accessing the Application
 
-After running the Docker container, you can access the Acestream Scrapper application in your web browser at [http://localhost:8000](http://localhost:8000).
+After running the Docker container, you can access the Acestream Scraper application in your web browser at [http://localhost:8000](http://localhost:8000).
 
 ### Notes
 

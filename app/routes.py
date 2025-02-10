@@ -1,6 +1,14 @@
+import os
 from flask import request, Response, render_template, jsonify
 from app import app
-from app.tasks import refresh_acestream_channels, generate_m3u_content, Session, AcestreamChannel, ScrapedURL, load_urls_from_config
+from app.task_manager import refresh_acestream_channels, generate_m3u_content
+from app.db_setup import setup_database, ScrapedURL, AcestreamChannel
+
+# Set the config directory
+config_dir = '/app/config' if os.getenv('DOCKER_ENV') == 'true' else os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config'))
+
+# Setup the database
+Session = setup_database(config_dir)
 
 last_refresh_date = None
 last_item_count = 0
@@ -9,10 +17,10 @@ last_item_count = 0
 def get_m3u_file():
     refresh = request.args.get('refresh', 'false').lower() == 'true'
     if refresh:
-        refresh_acestream_channels()
+        last_refresh_date = refresh_acestream_channels(config_dir, Session)
     
     base_url = request.args.get('base_url', app.config['base_url'])
-    m3u_content = generate_m3u_content(base_url)
+    m3u_content = generate_m3u_content(base_url, Session)
     return Response(m3u_content, mimetype='audio/x-mpegurl')
 
 @app.route('/', methods=['GET', 'POST'])
@@ -25,7 +33,7 @@ def get_acestream_list():
                 url_record = ScrapedURL(url=new_url, status='Pending', last_processed=None)
                 Session.add(url_record)
                 Session.commit()
-            refresh_acestream_channels()
+            last_refresh_date = refresh_acestream_channels(config_dir, Session)
     
     channels = Session.query(AcestreamChannel).all()
     current_item_count = len(channels)
@@ -33,3 +41,9 @@ def get_acestream_list():
     urls_info = Session.query(ScrapedURL).all()  # Get scraped URLs with status and last processed timestamp
 
     return render_template('index.html', urls=urls_info, last_refresh_date=last_refresh_date, last_item_count=last_item_count, current_item_count=current_item_count, channels=channels)
+
+@app.route('/refresh', methods=['POST'])
+def force_refresh():
+    global last_refresh_date
+    last_refresh_date = refresh_acestream_channels(config_dir, Session)
+    return jsonify({'status': 'Refresh initiated', 'last_refresh_date': last_refresh_date})

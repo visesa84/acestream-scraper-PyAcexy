@@ -6,3 +6,4 @@ msgpack==1.0.3
 gevent==24.11.1
 SQLAlchemy==1.4.18
 Werkzeug==2.0.1
+selenium==3.141.0

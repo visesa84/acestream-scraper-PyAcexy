@@ -3,10 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acestream Scrapper</title>
+    <title>Acestream Scraper</title>
+    <script>
+        function refreshScraper() {
+            fetch('/refresh', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert('Refresh initiated. Last refresh date: ' + data.last_refresh_date);
+                    // Optionally, you can reload the page to update the displayed data
+                    location.reload();
+                })
+                .catch(error => console.error('Error:', error));
+        }
+    </script>
 </head>
 <body>
-    <h1>Acestream Scrapper</h1>
+    <h1>Acestream Scraper</h1>
+    <button onclick="refreshScraper()">Force Refresh</button>
     <h2>Scraped URLs:</h2>
     <ul>
         {% for url in urls %}
@@ -28,5 +41,7 @@
             <li>{{ channel.name }} (ID: {{ channel.id }}) - Last Processed: {{ channel.last_processed }}</li>
         {% endfor %}
     </ul>
+    <h2>Links:</h2>
+    <p><a href="/list.m3u" target="_blank">Download M3U Playlist</a></p>
 </body>
 </html>
