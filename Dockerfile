@@ -10,16 +10,15 @@ RUN mkdir -p /app/config
 # Install wget, curl, and other dependencies
 RUN apt-get update && apt-get install -y wget curl gnupg
 
-# Install Chrome
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
-RUN sh -c 'echo "deb [arch=amd64] https://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-RUN apt-get update && apt-get install -y google-chrome-stable
+# Install Firefox and GeckoDriver
+RUN apt-get update && \
+    apt-get install -y firefox-esr && \
+    wget -O /tmp/geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/download/v0.35.0/geckodriver-v0.35.0-linux64.tar.gz && \
+    tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin && \
+    rm /tmp/geckodriver.tar.gz
 
-# Install chromedriver
-RUN apt-get install -yqq unzip
-RUN CHROMEDRIVER_VERSION=`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE` && \
-    wget -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip && \
-    unzip /tmp/chromedriver.zip -d /usr/local/bin/
+# Make GeckoDriver executable
+RUN chmod +x /usr/local/bin/geckodriver
 
 # Copy the requirements file and app code to the working directory
 COPY requirements.txt requirements.txt

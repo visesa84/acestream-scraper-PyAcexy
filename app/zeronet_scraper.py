@@ -1,11 +1,12 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from bs4 import BeautifulSoup
+import logging
 import re
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+from bs4 import BeautifulSoup
 from app.db_setup import AcestreamChannel, ScrapedURL
 from datetime import datetime
 
-def fetch_zeronet_channels(url, Session, timeout=10, retries=3):
+def fetch_zeronet_channels(url, Session, timeout=20, retries=5):
     status = "OK"
     channels = []
     identified_ids = set()
@@ -13,15 +14,18 @@ def fetch_zeronet_channels(url, Session, timeout=10, retries=3):
     options = Options()
     options.headless = True
     options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Firefox(options=options)
+
     try:
+        logging.info(f"Fetching channels from URL: {url}")
         driver.get(url)
         page_source = driver.page_source
+        logging.info("Page source fetched successfully")
         soup = BeautifulSoup(page_source, 'html.parser')
     except Exception as e:
+        logging.error(f"Error fetching channels from URL {url}: {e}")
         if retries > 0:
-            return fetch_zeronet_channels(url, Session, timeout + 5, retries - 1)
+            return fetch_zeronet_channels(url, Session, timeout + 10, retries - 1)
         else:
             status = "Error"
             return channels, status
@@ -58,4 +62,5 @@ def fetch_zeronet_channels(url, Session, timeout=10, retries=3):
     Session.add(url_record)
     Session.commit()
 
+    logging.info(f"Fetched {len(channels)} channels from URL: {url}")
     return channels, status
