@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acestream Scrapper</title>
+</head>
+<body>
+    <h1>Acestream Scrapper</h1>
+    <h2>Scraped URLs:</h2>
+    <ul>
+        {% for url in urls %}
+            <li>{{ url.url }} - Status: {{ url.status }} - Last Processed: {{ url.last_processed }}</li>
+        {% endfor %}
+    </ul>
+    <form method="POST">
+        <label for="new_url">Add URL:</label>
+        <input type="text" id="new_url" name="new_url">
+        <button type="submit">Add</button>
+    </form>
+    <h2>Metadata:</h2>
+    <p>Last Refresh Date: {{ last_refresh_date }}</p>
+    <p>Previous Item Count: {{ last_item_count }}</p>
+    <p>Current Item Count: {{ current_item_count }}</p>
+    <h2>Acestream Channels:</h2>
+    <ul>
+        {% for channel in channels %}
+            <li>{{ channel.name }} (ID: {{ channel.id }}) - Last Processed: {{ channel.last_processed }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
