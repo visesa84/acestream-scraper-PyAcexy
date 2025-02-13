@@ -63,6 +63,7 @@ Create a file named `config.json` in your config directory with this content:
 
 ### Web Interface
 Access the web interface at `http://localhost:8000`
+![image](https://github.com/user-attachments/assets/f87abf52-bb32-42f1-97e9-b7ca84e6a24c)
 
 ### M3U Playlist
 - Get playlist: `http://localhost:8000/list.m3u`
