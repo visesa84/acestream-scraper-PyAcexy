@@ -4,7 +4,7 @@ FROM python:3.9-slim
 # Add metadata labels
 LABEL maintainer="pipepito" \
       description="Acestream channel scraper with ZeroNet support" \
-      version="1.0.0"
+      version="1.1.0"
 
 # Set the working directory
 WORKDIR /app
@@ -19,16 +19,7 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     gcc \
     python3-dev \
-    build-essential \
-    firefox-esr
-
-# Install Firefox and GeckoDriver
-RUN wget -O /tmp/geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/download/v0.35.0/geckodriver-v0.35.0-linux64.tar.gz && \
-    tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin && \
-    rm /tmp/geckodriver.tar.gz
-
-# Make GeckoDriver executable
-RUN chmod +x /usr/local/bin/geckodriver
+    build-essential 
 
 # Copy application files
 COPY --chmod=0755 entrypoint.sh /app/entrypoint.sh
@@ -40,9 +31,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Gunicorn
 RUN pip install gunicorn
-
-# Install Selenium
-RUN pip install selenium
 
 # Install ZeroNet dependencies with specific versions
 RUN pip install --no-cache-dir \
