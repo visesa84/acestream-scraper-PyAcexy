@@ -1,4 +1,5 @@
 import os
+import sys
 from gunicorn.app.base import BaseApplication
 from app import create_app
 from app.tasks.manager import TaskManager
@@ -31,4 +32,4 @@ def start_task_manager(app):
 app = create_app()
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=8000)

@@ -178,3 +178,7 @@ cython_debug/
 .pypirc
 config/config.json
 config/acestream_channels.db
+
+# Add to ignore migration versions:
+migrations/versions/*
+!migrations/versions/.gitkeep

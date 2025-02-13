@@ -5,6 +5,8 @@ from ..models import ScrapedURL, AcestreamChannel
 from ..extensions import db
 from ..utils.config import Config
 from ..tasks.manager import TaskManager
+from ..services import ScraperService, PlaylistService
+from ..repositories import URLRepository
 
 bp = Blueprint('main', __name__)
 
@@ -61,7 +63,7 @@ def add_url():
     try:
         # Check if URL already exists
         existing_url = ScrapedURL.query.filter_by(url=url).first()
-        if existing_url:
+        if (existing_url):
             # Reset status to trigger new scrape
             existing_url.status = 'pending'
             existing_url.error_count = 0
@@ -163,23 +165,31 @@ def manage_url(url):
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/playlist.m3u')
-def get_playlist():
-    """Generate and return M3U playlist."""
-    channels = AcestreamChannel.query.all()
+async def get_playlist():
+    """Generate and return M3U playlist with optional refresh."""
+    should_refresh = request.args.get('refresh', '').lower() == 'true'
     
-    # Start with M3U header
-    playlist = ['#EXTM3U']
+    if should_refresh:
+        scraper_service = ScraperService()
+        url_repository = URLRepository()
+        urls = url_repository.get_all()
+        
+        # Process each URL sequentially
+        for url in urls:
+            if url.status != 'disabled':
+                try:
+                    await scraper_service.scrape_url(url.url)
+                except Exception as e:
+                    logger.error(f"Error refreshing URL {url.url}: {e}")
     
-    # Add each channel
-    for channel in channels:
-        # Add extended info
-        playlist.append(f'#EXTINF:-1,{channel.name}')
-        # Add stream URL
-        playlist.append(f'acestream://{channel.id}')
+    # Generate playlist using service
+    playlist_service = PlaylistService()
+    playlist = playlist_service.generate_playlist()
     
-    # Join with newlines and return as a playlist file
     return Response(
-        '\n'.join(playlist),
+        playlist,
         mimetype='audio/x-mpegurl',
-        headers={'Content-Disposition': f'attachment; filename=acestream_playlist_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.m3u'}
+        headers={
+            'Content-Disposition': f'attachment; filename=acestream_playlist_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.m3u'
+        }
     )
