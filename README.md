@@ -119,6 +119,31 @@ The application follows a service-oriented architecture with:
 - Async task management
 - Clear separation of concerns
 
+## Testing
+
+### Setup
+```bash
+# Install development dependencies
+pip install -r requirements-dev.txt
+```
+
+### Running Tests
+```bash
+# Run all tests
+pytest
+
+# Run specific test file
+pytest tests/unit/test_repositories.py
+
+# Run with coverage report
+pytest --cov=app tests/
+```
+
+### Test Structure
+- `tests/unit/`: Unit tests for individual components
+- `tests/integration/`: Integration tests for API endpoints
+- `tests/conftest.py`: Test fixtures and configuration
+
 ## Contributing
 
 Contributions are welcome! Please fork the repository and create a pull request with your changes.
