@@ -67,8 +67,8 @@ Access the web interface at `http://localhost:8000`
 ![image](https://github.com/user-attachments/assets/f87abf52-bb32-42f1-97e9-b7ca84e6a24c)
 
 ### M3U Playlist
-- Get playlist: `http://localhost:8000/list.m3u`
-- Force refresh: `http://localhost:8000/list.m3u?refresh=true`
+- Get playlist: `http://localhost:8000/playlist.m3u`
+- Force refresh: `http://localhost:8000/playlist.m3u?refresh=true`
 
 ## Configuration
 
