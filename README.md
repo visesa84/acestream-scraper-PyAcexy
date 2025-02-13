@@ -15,6 +15,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 
 ### Using Docker (Recommended)
 
+[Image in Docker Hub](https://hub.docker.com/r/pipepito/acestream-scraper)
 1. **Pull and run the container:**
    ```bash
    docker pull pipepito/acestream-scraper:latest
