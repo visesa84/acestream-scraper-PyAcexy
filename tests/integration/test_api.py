@@ -1,8 +1,12 @@
 import pytest
 from app.models import ScrapedURL, AcestreamChannel
+from app.utils.config import Config
 
-def test_get_playlist(client, db_session):
-    # Create test channels
+def test_get_playlist(client, db_session, config):
+    # Override config for test
+    Config._instance = config
+    
+    # Create test channel
     channel = AcestreamChannel(
         id="123",
         name="Test Channel",
@@ -16,7 +20,7 @@ def test_get_playlist(client, db_session):
     assert response.status_code == 200
     assert b'#EXTM3U' in response.data
     assert b'Test Channel' in response.data
-    assert b'acestream://123' in response.data
+    assert b'acestream://123' in response.data  # Fixed format
 
 def test_add_url(client, db_session):
     response = client.post('/api/urls', json={

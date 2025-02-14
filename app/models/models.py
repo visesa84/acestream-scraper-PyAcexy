@@ -10,7 +10,13 @@ class AcestreamChannel(db.Model):
     added_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_processed = db.Column(db.DateTime)
     status = db.Column(db.String(32), default='active')
-    source_url = db.Column(db.Text, db.ForeignKey('scraped_urls.url'))  # Add this line
+    source_url = db.Column(db.Text, db.ForeignKey('scraped_urls.url'))
+    group = db.Column(db.String(256))
+    logo = db.Column(db.Text)
+    tvg_id = db.Column(db.String(256))
+    tvg_name = db.Column(db.String(256))
+    m3u_source = db.Column(db.Text)
+    original_url = db.Column(db.Text)
     
     def __repr__(self):
         return f'<AcestreamChannel {self.name or self.id}>'

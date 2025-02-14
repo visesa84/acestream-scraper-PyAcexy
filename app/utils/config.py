@@ -6,9 +6,20 @@ from pathlib import Path
 class Config:
     """Configuration management class."""
     
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(Config, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
     DEFAULT_BASE_URL = "acestream://"
     
     def __init__(self):
+        if self._initialized:
+            return
+            
         # Setup console logging
         logging.basicConfig(
             level=logging.INFO,
@@ -28,6 +39,8 @@ class Config:
         
         # Add database path property
         self.database_path = self.config_path / 'acestream.db'
+        
+        self._initialized = True
 
     def _ensure_config_exists(self):
         """Ensure config directory and file exist with default values."""

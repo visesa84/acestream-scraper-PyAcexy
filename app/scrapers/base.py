@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 
 from ..extensions import db
 from ..models import ScrapedURL
+from ..services.m3u_service import M3UService
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,9 @@ class BaseScraper(ABC):
         self.timeout = timeout
         self.retries = retries
         self.acestream_pattern = re.compile(r'acestream://([\w\d]+)')
+        self.m3u_pattern = re.compile(r'https?://[^\s<>"]+?\.m3u[8]?(?=[\s<>"]|$)')
         self.identified_ids: Set[str] = set()
+        self.m3u_service = M3UService()
 
     @abstractmethod
     async def fetch_content(self, url: str) -> str:
@@ -61,8 +64,33 @@ class BaseScraper(ABC):
 
         return channels
 
-    async def scrape(self, url: str) -> Tuple[List[Tuple[str, str]], str]:
+    async def extract_from_m3u_links(self, content: str) -> List[Tuple[str, str, dict]]:
+        """Extract channels from M3U files linked in the content."""
+        channels = []
+        
+        # Find M3U links in content
+        m3u_urls = await self.m3u_service.find_m3u_links(content, self.current_url)
+        
+        # Add any direct M3U URLs found via regex
+        direct_m3u_urls = set(self.m3u_pattern.findall(content))
+        m3u_urls.extend(direct_m3u_urls)
+        
+        # Process each unique M3U URL
+        for m3u_url in set(m3u_urls):
+            try:
+                m3u_channels = await self.m3u_service.extract_channels_from_m3u(m3u_url)
+                for channel_id, name, metadata in m3u_channels:
+                    if channel_id not in self.identified_ids:
+                        channels.append((channel_id, name, metadata))
+                        self.identified_ids.add(channel_id)
+            except Exception as e:
+                logger.warning(f"Failed to process M3U file {m3u_url}: {e}")
+                
+        return channels
+
+    async def scrape(self, url: str) -> Tuple[List[Tuple[str, str, dict]], str]:
         """Main scraping method."""
+        self.current_url = url  # Store current URL for relative path resolution
         channels = []
         status = "OK"
         retries_left = self.retries
@@ -72,9 +100,14 @@ class BaseScraper(ABC):
                 content = await self.fetch_content(url)
                 soup = BeautifulSoup(content, 'html.parser')
                 
-                # Extract from both sources
-                channels.extend(self.extract_from_script(soup))
-                channels.extend(self.extract_from_content(soup))
+                # Extract from all sources
+                script_channels = [(id, name, {}) for id, name in self.extract_from_script(soup)]
+                content_channels = [(id, name, {}) for id, name in self.extract_from_content(soup)]
+                m3u_channels = await self.extract_from_m3u_links(content)
+                
+                channels.extend(script_channels)
+                channels.extend(content_channels)
+                channels.extend(m3u_channels)
                 
                 break
             except Exception as e:
@@ -83,7 +116,7 @@ class BaseScraper(ABC):
                 if retries_left < 0:
                     status = "Error"
                     break
-                self.timeout += 5  # Increase timeout for retry
+                self.timeout += 5
 
         # Update URL status in database
         self.update_url_status(url, status)

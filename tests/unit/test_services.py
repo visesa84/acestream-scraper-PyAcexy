@@ -13,24 +13,26 @@ async def test_scraper_service_scrape_url(db_session):
     db_session.add(url_obj)
     db_session.commit()
     
-    # Mock the scraper with AsyncMock
+    # Mock the scraper
     mock_scraper = AsyncMock()
-    mock_scraper.scrape.return_value = ([("123", "Test Channel")], "OK")
+    mock_scraper.scrape.return_value = ([("123", "Test Channel", {})], "OK")
     
-    with patch('app.services.scraper_service.create_scraper', return_value=mock_scraper):
+    with patch('app.scrapers.create_scraper', return_value=mock_scraper):
         links, status = await service.scrape_url(url)
         
         assert status == "OK"
         assert len(links) == 1
-        assert links[0] == ("123", "Test Channel")
+        assert links[0][0] == "123"
+        assert links[0][1] == "Test Channel"
         
         # Check that channel was created
         channel = service.channel_repository.get_by_id("123")
         assert channel is not None
         assert channel.name == "Test Channel"
 
-def test_playlist_service_generate(db_session):
+def test_playlist_service_generate(db_session, config):
     service = PlaylistService()
+    service.config = config
     
     # Create test channels
     channel_repo = service.channel_repository
@@ -42,6 +44,6 @@ def test_playlist_service_generate(db_session):
     
     assert "#EXTM3U" in playlist
     assert "Test Channel 1" in playlist
-    assert "acestream://123" in playlist
+    assert "acestream://123" in playlist  # Fixed format
     assert "Test Channel 2" in playlist
-    assert "acestream://456" in playlist
+    assert "acestream://456" in playlist  # Fixed format
