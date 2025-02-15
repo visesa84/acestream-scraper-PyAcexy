@@ -30,9 +30,11 @@ async def test_scraper_service_scrape_url(db_session):
         assert channel is not None
         assert channel.name == "Test Channel"
 
-def test_playlist_service_generate(db_session, config):
+def test_playlist_service_generate(db_session):
     service = PlaylistService()
-    service.config = config
+    
+    # Set test base URL
+    service.config._config = {"base_url": "acestream://"}
     
     # Create test channels
     channel_repo = service.channel_repository
@@ -44,6 +46,6 @@ def test_playlist_service_generate(db_session, config):
     
     assert "#EXTM3U" in playlist
     assert "Test Channel 1" in playlist
-    assert "acestream://123" in playlist  # Fixed format
+    assert "acestream://123" in playlist
     assert "Test Channel 2" in playlist
-    assert "acestream://456" in playlist  # Fixed format
+    assert "acestream://456" in playlist

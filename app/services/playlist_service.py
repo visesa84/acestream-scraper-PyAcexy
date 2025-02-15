@@ -9,12 +9,7 @@ class PlaylistService:
     def _format_stream_url(self, channel_id: str) -> str:
         """Format stream URL based on base_url configuration."""
         base_url = self.config.base_url
-        
-        if base_url.startswith('acestream://'):
-            return f'acestream://{channel_id}'  # Keep acestream:// protocol as is
-        else:
-            # For HTTP URLs, ensure single slash between base and ID by removing trailing slashes
-            return f'{base_url.rstrip("/")}/{channel_id}'
+        return f'{base_url}{channel_id}'
 
     def generate_playlist(self) -> str:
         """Generate M3U playlist from active channels."""
