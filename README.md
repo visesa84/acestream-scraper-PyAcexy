@@ -70,6 +70,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 
 ### Web Interface
 Access the web interface at `http://localhost:8000`
+![image](https://github.com/user-attachments/assets/5043a652-dc5a-4227-904e-21828fac089e)
 
 ### M3U Playlist
 - Get current playlist: `http://localhost:8000/playlist.m3u`
