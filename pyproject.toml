@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acestream-scraper"
+version = "0.1.0"
+description = "Acestream channel scraper with ZeroNet support"
+readme = "README.md"
+authors = [{name = "pipepito"}]
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "aiohttp>=3.11.12",
+    "asgiref>=3.4.1",
+    "beautifulsoup4>=4.9.3",
+    "flask[async]>=2.0.1",
+    "flask-migrate>=4.0.5",
+    "flask-sqlalchemy>=2.5.1",
+    "sqlalchemy>=1.4.23",
+    "werkzeug>=2.0.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/acestream-scraper"
+
+[project.scripts]
+acestream-scraper = "acestream_scraper.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["acestream_scraper"]
+include-package-data = true

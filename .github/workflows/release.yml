@@ -26,6 +26,23 @@ jobs:
           
       - name: Create package files
         run: |
+          # Create source directory
+          mkdir -p src/acestream_scraper
+          
+          # Move app contents to src layout
+          if [ -d "app" ]; then
+            cp -r app/* src/acestream_scraper/
+            rm -rf app
+          fi
+
+          # Copy migrations folder to package
+          if [ -d "migrations" ]; then
+            cp -r migrations src/acestream_scraper/
+          fi
+          
+          # Copy additional files
+          cp migrations_app.py manage.py wsgi.py src/acestream_scraper/
+          
           # Create pyproject.toml
           cat > pyproject.toml << EOL
           [build-system]
@@ -57,6 +74,14 @@ jobs:
 
           [project.urls]
           Homepage = "https://github.com/yourusername/acestream-scraper"
+
+          [project.scripts]
+          acestream-scraper = "acestream_scraper.__main__:main"
+
+          [tool.setuptools]
+          package-dir = {"" = "src"}
+          packages = ["acestream_scraper"]
+          include-package-data = true
           EOL
 
           # Update version in pyproject.toml
@@ -64,7 +89,7 @@ jobs:
           sed -i "s/\${VERSION}/$VERSION/" pyproject.toml
           
           # Create __init__.py with version
-          echo "__version__ = '$VERSION'" > app/__init__.py
+          echo "__version__ = '$VERSION'" > src/acestream_scraper/__init__.py
           
       - name: Build package
         run: python -m build

@@ -1,0 +1,7 @@
+include README.md
+include LICENSE
+include requirements*.txt
+include pyproject.toml
+recursive-include src/acestream_scraper *
+recursive-include src/acestream_scraper/migrations *
+recursive-include src/acestream_scraper/templates *
