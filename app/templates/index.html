@@ -11,7 +11,10 @@
         .status-pending { color: #ffc107; }
         .card { margin-bottom: 1rem; }
         .refresh-btn { cursor: pointer; }
-        #loading { display: none; }
+        #loading { 
+            display: none;
+            z-index: 1050;
+        }
         .text-break {
             word-break: break-word;
             overflow-wrap: break-word;
@@ -26,36 +29,10 @@
 </head>
 <body>
     <div class="container py-4">
+        <span id="loading" class="spinner-border spinner-border-sm position-fixed top-0 end-0 m-4" role="status" aria-hidden="true"></span>
         <header class="pb-3 mb-4 border-bottom">
             <div class="d-flex justify-content-between align-items-center">
                 <h1>Acestream Scraper Dashboard</h1>
-                <div class="d-flex align-items-center">
-                    <span id="loading" class="spinner-border spinner-border-sm" role="status"></span>
-                    <div class="btn-group ms-2">
-                        <a href="/playlist.m3u" target="_blank" class="btn btn-success">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">
-                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-                            </svg>
-                            Download M3U
-                        </a>
-                        <a href="/playlist.m3u?refresh=true" target="_blank" class="btn btn-outline-success">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-repeat" viewBox="0 0 16 16">
-                                <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
-                                <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/>
-                            </svg>
-                            Download Fresh M3U
-                        </a>
-                    </div>
-                    <button onclick="refreshAllUrls()" class="btn btn-primary ms-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                        </svg>
-                        Refresh All
-                    </button>
-                    <span class="refresh-btn ms-2" onclick="refreshData()">🔄</span>
-                </div>
             </div>
         </header>
 
@@ -89,8 +66,43 @@
                 </form>
             </div>
         </div>
-
-        <!-- Add after the base URL configuration card -->
+        <!-- Stats Section -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="card-title mb-0">URLs Being Scraped</h5>
+                        </div>
+                        <div id="urlsList"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="card-title mb-0">Total Channels</h5>
+                                <button onclick="refreshData()" class="btn btn-sm btn-outline-secondary" title="Refresh UI">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                                        <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                                        <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                                    </svg>
+                                    <span class="ms-1">Refresh UI</span>
+                                </button>
+                            </div>
+                            <h2 id="totalChannels" class="mb-0">0</h2>
+                        </div>
+                        <div>
+                            <h5 class="card-title">Base URL</h5>
+                            <p id="currentBaseUrlDisplay" class="mb-1 text-muted small"></p>
+                            <p id="sampleUrlDisplay" class="text-break text-muted small"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title">Add Channel Manually</h5>
@@ -109,28 +121,47 @@
                 </form>
             </div>
         </div>
-
-        <!-- Stats Section -->
-        <div class="row mb-4">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">URLs Being Scraped</h5>
-                        <div id="urlsList"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <h5 class="card-title">Total Channels</h5>
-                            <h2 id="totalChannels">0</h2>
+        <!-- Add before the Channels Table card -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+                                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                                </svg>
+                            </span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="channelSearch" 
+                                   placeholder="Search channels..."
+                                   onkeyup="debounce(searchChannels, 300)(this.value)">
                         </div>
-                        <div>
-                            <h5 class="card-title">Base URL</h5>
-                            <p id="currentBaseUrlDisplay" class="mb-1 text-muted small"></p>
-                            <p id="sampleUrlDisplay" class="text-break text-muted small"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="btn-group float-md-end">
+                            <button onclick="refreshAllUrls()" class="btn btn-primary btn-sm" title="Refresh all channel data">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M7.646 10.854a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 9.293V5.5a.5.5 0 0 0-1 0v3.793L6.354 8.146a.5.5 0 1 0-.708.708l2 2z"/>
+                                    <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
+                                </svg>
+                                <span class="ms-1">Refresh All Data</span>
+                            </button>
+                            <button class="btn btn-success" onclick="downloadPlaylist(false)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">
+                                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                    <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                                </svg>
+                                Download M3U
+                            </button>
+                            <button class="btn btn-outline-success" onclick="downloadPlaylist(true)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-repeat" viewBox="0 0 16 16">
+                                    <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
+                                    <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/>
+                                </svg>
+                                Download Fresh M3U
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -171,6 +202,8 @@
         async function refreshData() {
             showLoading();
             try {
+                const searchTerm = document.getElementById('channelSearch')?.value || '';
+
                 const statsResponse = await fetch('/api/stats');
                 const stats = await statsResponse.json();
                 
@@ -209,7 +242,7 @@
                     sampleUrlDisplay.innerHTML = `Sample: <code>${stats.base_url}${'1'.repeat(40)}</code>`;
                 }
 
-                const channelsResponse = await fetch('/api/channels');
+                const channelsResponse = await fetch(`/api/channels?search=${encodeURIComponent(searchTerm)}`);
                 const channels = await channelsResponse.json();
                 
                 const channelsList = document.getElementById('channelsList');
@@ -446,6 +479,66 @@
                 hideLoading();
             }
         });
+
+        // Debounce function to limit API calls
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Search channels function
+        async function searchChannels(searchTerm) {
+            try {
+                showLoading();
+                const response = await fetch(`/api/channels?search=${encodeURIComponent(searchTerm)}`);
+                const channels = await response.json();
+                
+                const channelsList = document.getElementById('channelsList');
+                channelsList.innerHTML = channels.map(channel => `
+                    <tr>
+                        <td>${channel.name}</td>
+                        <td><code>${channel.id}</code></td>
+                        <td>${new Date(channel.last_processed).toLocaleString()}</td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="deleteChannel('${channel.id}')">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error searching channels:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Add this to your JavaScript section
+        function downloadPlaylist(refresh = false) {
+            const searchTerm = document.getElementById('channelSearch').value.trim();
+            let url = '/playlist.m3u';
+            const params = new URLSearchParams();
+            
+            if (refresh) {
+                params.append('refresh', 'true');
+            }
+            if (searchTerm) {
+                params.append('search', searchTerm);
+            }
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            window.location.href = url;
+        }
 
         // Initial data load
         refreshData();

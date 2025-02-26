@@ -45,8 +45,16 @@ def get_stats():
 
 @bp.route('/api/channels')
 def get_channels():
-    """Get all channels."""
-    channels = AcestreamChannel.query.all()
+    """Get all channels with optional name filter."""
+    search = request.args.get('search', '').strip().lower()
+    
+    query = AcestreamChannel.query
+    
+    if search:
+        # Case-insensitive search on channel name
+        query = query.filter(AcestreamChannel.name.ilike(f'%{search}%'))
+    
+    channels = query.all()
     return jsonify([{
         'id': ch.id,
         'name': ch.name,
@@ -219,8 +227,9 @@ def manage_url(url):
 
 @bp.route('/playlist.m3u')
 async def get_playlist():
-    """Generate and return M3U playlist with optional refresh."""
+    """Generate and return M3U playlist with optional refresh and filtering."""
     should_refresh = request.args.get('refresh', '').lower() == 'true'
+    search = request.args.get('search', '').strip().lower()
     
     if should_refresh:
         scraper_service = ScraperService()
@@ -235,15 +244,21 @@ async def get_playlist():
                 except Exception as e:
                     logger.error(f"Error refreshing URL {url.url}: {e}")
     
-    # Generate playlist using service
+    # Generate playlist using service with search parameter
     playlist_service = PlaylistService()
-    playlist = playlist_service.generate_playlist()
+    playlist = playlist_service.generate_playlist(search_term=search)
+    
+    # Modify filename to indicate if it's filtered
+    filename = f"acestream_playlist_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    if search:
+        filename += f"_filtered"
+    filename += ".m3u"
     
     return Response(
         playlist,
         mimetype='audio/x-mpegurl',
         headers={
-            'Content-Disposition': f'attachment; filename=acestream_playlist_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.m3u'
+            'Content-Disposition': f'attachment; filename={filename}'
         }
     )
 

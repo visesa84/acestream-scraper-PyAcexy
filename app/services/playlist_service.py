@@ -11,9 +11,21 @@ class PlaylistService:
         base_url = self.config.base_url
         return f'{base_url}{channel_id}'
 
-    def generate_playlist(self) -> str:
-        """Generate M3U playlist from active channels."""
-        channels = self.channel_repository.get_active()
+    def generate_playlist(self, search_term: str = None) -> str:
+        """
+        Generate M3U playlist from active channels.
+        
+        Args:
+            search_term (str, optional): Filter channels by name
+        """
+        # Get channels with optional filter
+        if search_term:
+            channels = self.channel_repository.model.query.filter(
+                (self.channel_repository.model.status == 'active') &
+                (self.channel_repository.model.name.ilike(f'%{search_term}%'))
+            ).all()
+        else:
+            channels = self.channel_repository.get_active()
         
         playlist = ['#EXTM3U']
         for channel in channels:

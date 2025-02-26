@@ -104,6 +104,48 @@ When using Docker, mount your local config directory to `/app/config`:
 - `config.json`: Configuration file
 - `acestream.db`: SQLite database (created automatically)
 
+### ZeroNet Configuration
+
+The application looks for a `zeronet.conf` file in the `/app/config` directory. If none exists, it creates one with default values:
+
+```ini
+[global]
+ui_ip = *
+ui_host =
+ 0.0.0.0
+ localhost
+ui_port = 43110
+```
+
+To customize ZeroNet access:
+
+1. Create your own `config/zeronet.conf`:
+```ini
+[global]
+ui_ip = *
+ui_host =
+ 127.0.0.1
+ your.domain.com
+ another.domain.com
+ localhost:43110
+ui_port = 43110
+```
+
+2. Mount it when running the container:
+```bash
+docker run -d \
+  -p 8000:8000 \
+  -p 43110:43110 \
+  -p 43111:43111 \
+  -v "${PWD}/config:/app/config" \
+  pipepito/acestream-scraper:latest
+```
+
+### Security Note
+- Add your domain(s) to `ui_host` for public access
+- Use one domain per line after `ui_host =`
+- Always include `localhost` for local access
+
 ### Development
 For development, use `run_dev.py` which provides:
 - Debug mode
