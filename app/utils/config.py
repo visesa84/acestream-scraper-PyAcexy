@@ -15,6 +15,7 @@ class Config:
         return cls._instance
     
     DEFAULT_BASE_URL = "acestream://"
+    DEFAULT_ACE_ENGINE_URL = "http://127.0.0.1:6878"
     
     def __init__(self):
         if self._initialized:
@@ -50,7 +51,8 @@ class Config:
             if not self.config_file.exists():
                 default_config = {
                     "urls": [],
-                    "base_url": self.DEFAULT_BASE_URL
+                    "base_url": self.DEFAULT_BASE_URL,
+                    "ace_engine_url": self.DEFAULT_ACE_ENGINE_URL
                 }
                 
                 with open(self.config_file, 'w') as f:
@@ -104,6 +106,11 @@ class Config:
     def database_uri(self) -> str:
         """Get SQLite database URI."""
         return f'sqlite:///{self.database_path}'
+
+    @property
+    def ace_engine_url(self) -> str:
+        """Get Acestream Engine URL."""
+        return self._config.get('ace_engine_url', self.DEFAULT_ACE_ENGINE_URL)
 
     def add_url(self, url: str) -> bool:
         """

@@ -7,6 +7,7 @@ from ..utils.config import Config
 from ..tasks.manager import TaskManager
 from ..services import ScraperService, PlaylistService
 from ..repositories import URLRepository, ChannelRepository
+from ..services.channel_status_service import ChannelStatusService
 
 bp = Blueprint('main', __name__)
 
@@ -25,6 +26,10 @@ def get_stats():
     channels = AcestreamChannel.query.all()
     config = Config()
     
+    # Count channels by status
+    total_checked = sum(1 for ch in channels if ch.last_checked is not None)
+    online_channels = sum(1 for ch in channels if ch.is_online)
+    
     url_stats = []
     for url in urls:
         channel_count = AcestreamChannel.query.filter_by(source_url=url.url).count()
@@ -40,7 +45,11 @@ def get_stats():
     return jsonify({
         'urls': url_stats,
         'total_channels': len(channels),
-        'base_url': config.base_url  # Add this line
+        'channels_checked': total_checked,
+        'channels_online': online_channels,
+        'channels_offline': total_checked - online_channels,
+        'base_url': config.base_url,
+        'ace_engine_url': config.ace_engine_url 
     })
 
 @bp.route('/api/channels')
@@ -58,7 +67,10 @@ def get_channels():
     return jsonify([{
         'id': ch.id,
         'name': ch.name,
-        'last_processed': ch.last_processed.isoformat() if ch.last_processed else None
+        'last_processed': ch.last_processed.isoformat() if ch.last_processed else None,
+        'is_online': ch.is_online,
+        'last_checked': ch.last_checked.isoformat() if ch.last_checked else None,
+        'check_error': ch.check_error
     } for ch in channels])
 
 # Add this new route
@@ -280,6 +292,79 @@ def update_base_url():
         return jsonify({
             'message': 'Base URL updated successfully',
             'sample': f"{new_base_url}{'1' * 40}"  # 40-char sample acestream ID
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Add new route in the blueprint
+@bp.route('/api/channels/check-status', methods=['POST'])
+async def check_channels_status():
+    """Check status of all active channels."""
+    try:
+        channel_repo = ChannelRepository()
+        status_service = ChannelStatusService()
+        
+        # Get all active channels
+        channels = channel_repo.get_active()
+        
+        # Check status of all channels
+        results = await status_service.check_channels(channels)
+        
+        # Count online/offline channels
+        online_count = sum(1 for r in results if r)
+        
+        return jsonify({
+            'message': 'Channel status check completed',
+            'total': len(channels),
+            'online': online_count,
+            'offline': len(channels) - online_count
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/api/config/ace_engine_url', methods=['PUT'])
+def update_ace_engine_url():
+    """Update the Ace Engine URL configuration."""
+    try:
+        data = request.get_json()
+        new_url = data.get('ace_engine_url')
+        
+        if not new_url:
+            return jsonify({'error': 'ace_engine_url is required'}), 400
+            
+        config = Config()
+        config._config['ace_engine_url'] = new_url
+        config._save_config()
+        
+        return jsonify({
+            'message': 'Ace Engine URL updated successfully',
+            'ace_engine_url': new_url
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/api/channels/<channel_id>/check-status', methods=['POST'])
+async def check_channel_status(channel_id):
+    """Check status of a specific channel."""
+    try:
+        channel_repo = ChannelRepository()
+        status_service = ChannelStatusService()
+        
+        channel = channel_repo.get_by_id(channel_id)
+        if not channel:
+            return jsonify({'error': 'Channel not found'}), 404
+        
+        is_online = await status_service.check_channel(channel)
+        
+        return jsonify({
+            'message': 'Channel status check completed',
+            'channel_id': channel_id,
+            'is_online': is_online,
+            'last_checked': channel.last_checked.isoformat() if channel.last_checked else None,
+            'error': channel.check_error
         })
         
     except Exception as e:

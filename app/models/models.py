@@ -17,6 +17,9 @@ class AcestreamChannel(db.Model):
     tvg_name = db.Column(db.String(256))
     m3u_source = db.Column(db.Text)
     original_url = db.Column(db.Text)
+    is_online = db.Column(db.Boolean, default=False)
+    last_checked = db.Column(db.DateTime)
+    check_error = db.Column(db.Text)
     
     def __repr__(self):
         return f'<AcestreamChannel {self.name or self.id}>'
