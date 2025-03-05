@@ -2,6 +2,7 @@
 
 A Python-based web scraping application that retrieves Acestream channel information and generates M3U playlists. Built using Flask, BeautifulSoup, and SQLAlchemy.
 
+[![Release Pipeline](https://github.com/Pipepito/acestream-scraper/actions/workflows/release.yml/badge.svg)](https://github.com/Pipepito/acestream-scraper/actions/workflows/release.yml)
 ## Features
 
 - Scrapes Acestream channel information from multiple URLs
@@ -27,6 +28,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
      -p 8000:8000 \
      -p 43110:43110 \
      -p 43111:43111 \
+     -e TZ=Europe/Madrid
      -v "${PWD}/config:/app/config" \
      pipepito/acestream-scraper:latest
    ```
@@ -168,6 +170,7 @@ docker run -d \
   -p 8000:8000 \
   -p 43110:43110 \
   -p 43111:43111 \
+  -e TZ=Europe/Madrid
   -v "${PWD}/config:/app/config" \
   pipepito/acestream-scraper:latest
 ```
