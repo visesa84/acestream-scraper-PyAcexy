@@ -30,23 +30,6 @@ if [ "$ENABLE_TOR" = "true" ]; then
     sleep 3
 fi
 
-# Start Acexy if enabled
-if [ "$ENABLE_ACEXY" = "true" ]; then
-    echo "Starting Acestream engine and Acexy proxy..."
-    
-    if [[ $ALLOW_REMOTE_ACCESS == "yes" ]];then
-        EXTRA_FLAGS="$EXTRA_FLAGS --bind-all"
-    fi
-    # Start the Acestream engine
-    /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS &
-    
-    # Brief pause to allow Acestream engine to start
-    sleep 3
-    
-    # Start Acexy proxy
-    /usr/local/bin/acexy &
-fi
-
 # Start ZeroNet in the background
 cd /app/ZeroNet
 echo "Starting ZeroNet..."
@@ -57,7 +40,7 @@ ZERONET_PID=$!
 echo "Waiting for ZeroNet to initialize..."
 sleep 10
 
-# Start Flask app with Gunicorn
+# Start Flask app with Gunicorn with increased timeouts
 cd /app
 echo "Starting Flask application..."
 exec gunicorn \
@@ -67,12 +50,8 @@ exec gunicorn \
     --keep-alive 5 \
     --worker-class uvicorn.workers.UvicornWorker \
     --log-level info \
-    "wsgi:asgi_app" &
-GUNICORN_PID=$!
+    "wsgi:asgi_app"
 
 # Monitor processes
 echo "Services started. Monitoring processes..."
-trap "echo 'Shutting down services...'; kill $(jobs -p)" EXIT INT TERM QUIT
-
-# Wait for any process to exit
-wait
+trap "kill $ZERONET_PID" EXIT
