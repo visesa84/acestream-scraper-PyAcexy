@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import aiohttp
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from ..models import AcestreamChannel
 from ..extensions import db
@@ -23,7 +23,7 @@ class ChannelStatusService:
         Returns True if channel is online, False otherwise.
         """
         try:
-            channel.last_checked = datetime.utcnow()
+            channel.last_checked = datetime.now(timezone.utc)
             
             # Build status check URL
             status_url = f"{self.ace_engine_url}/ace/getstream"
@@ -108,3 +108,14 @@ class ChannelStatusService:
         
         tasks = [check_with_semaphore(channel) for channel in channels]
         return await asyncio.gather(*tasks)
+
+async def check_channel_status(channel: AcestreamChannel) -> dict:
+    """Check status of a single channel."""
+    service = ChannelStatusService()
+    is_online = await service.check_channel(channel)
+    
+    return {
+        'is_online': is_online,
+        'last_checked': channel.last_checked,
+        'error': channel.check_error
+    }
