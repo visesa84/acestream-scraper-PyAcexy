@@ -157,3 +157,30 @@ class ChannelRepository(BaseRepository[AcestreamChannel]):
             self._db.session.rollback()
             logger.error(f"Error removing offline channels: {e}")
             return 0
+
+    def update_channel_status(self, channel_id: str, is_online: bool, check_time: datetime, error: str = None) -> bool:
+        """Update a single channel's status."""
+        try:
+            # Use execute directly with autocommit
+            result = self._db.session.execute(
+                """UPDATE acestream_channels 
+                   SET is_online = :is_online,
+                       last_checked = :check_time,
+                       check_error = :error
+                   WHERE id = :channel_id""",
+                {
+                    'channel_id': channel_id,
+                    'is_online': is_online,
+                    'check_time': check_time,
+                    'error': error
+                }
+            )
+            self._db.session.commit()
+            return True
+        except SQLAlchemyError as e:
+            logger.error(f"Error updating status for channel {channel_id}: {e}")
+            try:
+                self._db.session.rollback()
+            except:
+                pass
+            return False

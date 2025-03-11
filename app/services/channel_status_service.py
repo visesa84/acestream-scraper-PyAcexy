@@ -6,6 +6,7 @@ from typing import Optional
 from ..models import AcestreamChannel
 from ..extensions import db
 from ..utils.config import Config
+from ..repositories.channel_repository import ChannelRepository  # Add this import
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class ChannelStatusService:
         config = Config()
         self.ace_engine_url = config.ace_engine_url
         self.timeout = 10
+        self.repo = ChannelRepository()  # Create single repository instance
         
     async def check_channel(self, channel: AcestreamChannel) -> bool:
         """
@@ -23,7 +25,7 @@ class ChannelStatusService:
         Returns True if channel is online, False otherwise.
         """
         try:
-            channel.last_checked = datetime.now(timezone.utc)
+            check_time = datetime.now(timezone.utc)
             
             # Build status check URL
             status_url = f"{self.ace_engine_url}/ace/getstream"
@@ -47,57 +49,41 @@ class ChannelStatusService:
                                 response_data = data.get('response', {})
                                 error = data.get('error')
                                 
-                                # Check for "got newer download" message - consider channel valid
+                                # Check for "got newer download" message
                                 if error and "got newer download" in str(error).lower():
-                                    channel.is_online = True
-                                    channel.check_error = None
+                                    self.repo.update_channel_status(channel.id, True, check_time)
                                     logger.info(f"Channel {channel.id} ({channel.name}) is online (newer version available)")
                                     return True
                                 
-                                # Channel is considered online if:
-                                # 1. No error is present
-                                # 2. We have response data
-                                # 3. is_live flag is 1 (or True)
+                                # Check regular online status
                                 if (error is None and 
                                     response_data and 
                                     response_data.get('is_live') == 1):
-                                    channel.is_online = True
-                                    channel.check_error = None
+                                    self.repo.update_channel_status(channel.id, True, check_time)
                                     logger.info(f"Channel {channel.id} ({channel.name}) is online")
                                     return True
                                 
-                                # Channel exists but is not available
-                                channel.is_online = False
-                                channel.check_error = error if error else "Channel is not live"
-                                logger.info(f"Channel {channel.id} ({channel.name}) is offline: {channel.check_error}")
+                                # Channel exists but not available
+                                error_msg = error if error else "Channel is not live"
+                                self.repo.update_channel_status(channel.id, False, check_time, error_msg)
+                                logger.info(f"Channel {channel.id} ({channel.name}) is offline: {error_msg}")
                                 return False
                                 
-                            channel.is_online = False
-                            channel.check_error = "Invalid response format"
+                            self.repo.update_channel_status(channel.id, False, check_time, "Invalid response format")
                             return False
                                 
                         except ValueError as e:
-                            channel.is_online = False
-                            channel.check_error = f"Invalid response format: {str(e)}"
+                            self.repo.update_channel_status(channel.id, False, check_time, f"Invalid response format: {str(e)}")
                             return False
                     
-                    channel.is_online = False
-                    channel.check_error = f"HTTP {response.status}"
+                    self.repo.update_channel_status(channel.id, False, check_time, f"HTTP {response.status}")
                     return False
             
         except Exception as e:
-            channel.is_online = False
-            channel.check_error = str(e)
+            logger.error(f"Error checking channel {channel.id}: {e}")
+            self.repo.update_channel_status(channel.id, False, check_time, str(e))
             return False
             
-        finally:
-            try:
-                db.session.commit()
-            except Exception as e:
-                logger.error(f"Database error for channel {channel.id}: {str(e)}")
-                db.session.rollback()
-                raise
-                
     async def check_channels(self, channels: list[AcestreamChannel], concurrency: int = 5):
         """Check multiple channels concurrently."""
         semaphore = asyncio.Semaphore(concurrency)
@@ -119,3 +105,40 @@ async def check_channel_status(channel: AcestreamChannel) -> dict:
         'last_checked': channel.last_checked,
         'error': channel.check_error
     }
+
+def check_all_channels_status() -> dict:
+    """Check status for all channels in the database."""
+    try:
+        from ..repositories.channel_repository import ChannelRepository
+        
+        # Get all channels
+        channel_repo = ChannelRepository()
+        channels = channel_repo.get_all()
+        
+        # Create service instance
+        service = ChannelStatusService()
+        
+        # Always create a new event loop in thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Run status checks using new loop
+            results = loop.run_until_complete(service.check_channels(channels))
+            
+            # Count results
+            online_count = sum(1 for result in results if result)
+            offline_count = len(results) - online_count
+            
+            return {
+                'online': online_count,
+                'offline': offline_count,
+                'total': len(results)
+            }
+        finally:
+            # Clean up the loop
+            loop.close()
+            
+    except Exception as e:
+        logger.error(f"Error checking all channels status: {e}", exc_info=True)
+        raise
