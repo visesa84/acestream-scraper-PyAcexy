@@ -27,8 +27,6 @@ def upgrade():
     with op.batch_alter_table('settings') as batch_op:
         if not has_column('settings', 'last_updated'):
             batch_op.add_column(sa.Column('last_updated', sa.DateTime(), nullable=True))
-            # Set initial values
-            op.execute("UPDATE settings SET last_updated = CURRENT_TIMESTAMP")
 
 def downgrade():
     with op.batch_alter_table('settings') as batch_op:
