@@ -1,14 +1,13 @@
 """Create settings table
 
-Revision ID: create_settings_table
-Create Date: 2025-03-10 00:00:00.000000
-
+Revision ID: 4e3b1a9c8f21
 """
 from alembic import op
 import sqlalchemy as sa
-import json
-import os
 from pathlib import Path
+import os
+import json
+from sqlalchemy.engine.reflection import Inspector
 
 
 # revision identifiers, used by Alembic.
@@ -53,35 +52,49 @@ def load_existing_config():
     return default_config
 
 
+def has_table(table_name):
+    """Check if a table exists"""
+    conn = op.get_bind()
+    insp = Inspector.from_engine(conn)
+    return table_name in insp.get_table_names()
+
+
+def has_setting(key):
+    """Check if a setting exists"""
+    conn = op.get_bind()
+    result = conn.execute(f"SELECT COUNT(*) FROM settings WHERE key = '{key}'").scalar()
+    return result > 0
+
+
 def upgrade():
-    # Create settings table if it doesn't exist
-    op.create_table(
-        'settings',
-        sa.Column('key', sa.String(128), nullable=False),
-        sa.Column('value', sa.String(4096), nullable=True),
-        sa.PrimaryKeyConstraint('key')
-    )
-    
-    # Get existing config values
-    config = load_existing_config()
-    
-    # Insert settings from existing config using raw SQL for maximum compatibility
-    op.execute(
-        f"INSERT INTO settings (key, value) VALUES ('base_url', '{config['base_url']}')"
-    )
-    op.execute(
-        f"INSERT INTO settings (key, value) VALUES ('ace_engine_url', '{config['ace_engine_url']}')"
-    )
-    op.execute(
-        f"INSERT INTO settings (key, value) VALUES ('rescrape_interval', '{config['rescrape_interval']}')"
-    )
-    op.execute(
-        "INSERT INTO settings (key, value) VALUES ('setup_completed', 'true')"
-    )
-    op.execute(
-        f"INSERT INTO settings (key, value) VALUES ('setup_timestamp', '{sa.func.now()}')"
-    )
+    if not has_table('settings'):
+        # Create settings table
+        op.create_table(
+            'settings',
+            sa.Column('key', sa.String(128), nullable=False),
+            sa.Column('value', sa.String(4096), nullable=True),
+            sa.PrimaryKeyConstraint('key')
+        )
+        
+        # Get existing config values
+        config = load_existing_config()
+        
+        # Insert settings safely
+        settings_to_insert = [
+            ('base_url', config['base_url']),
+            ('ace_engine_url', config['ace_engine_url']),
+            ('rescrape_interval', str(config['rescrape_interval'])),
+            ('setup_completed', 'true'),
+            ('setup_timestamp', sa.func.now())
+        ]
+        
+        for key, value in settings_to_insert:
+            if not has_setting(key):
+                op.execute(
+                    f"INSERT INTO settings (key, value) VALUES ('{key}', '{value}')"
+                )
 
 
 def downgrade():
-    op.drop_table('settings')
+    if has_table('settings'):
+        op.drop_table('settings')
