@@ -24,6 +24,9 @@ async function loadConfigData() {
         // Update Acexy status
         await updateAcexyStatus();
         
+        // Update Acestream Engine status
+        await updateAcestreamStatus();
+        
         // Load URLs list
         await loadUrlsList();
         
@@ -77,6 +80,66 @@ async function updateAcexyStatus() {
             acexyStatusElement.className = 'badge bg-warning';
             acexyStatusElement.textContent = 'Error';
         }
+    }
+}
+
+// Update Acestream Engine status in the config page
+async function updateAcestreamStatus() {
+    try {
+        const response = await fetch('/api/config/acestream_status');
+        const data = await response.json();
+        
+        const acestreamStatusElement = document.getElementById('acestreamStatusConfig');
+        const configAcestreamStatus = document.getElementById('configAcexyStatus');
+        const acestreamDetailsElement = document.getElementById('acestreamDetailsConfig');
+        const versionElement = document.getElementById('acestreamVersionConfig');
+        const platformElement = document.getElementById('acestreamPlatformConfig');
+        const networkElement = document.getElementById('acestreamNetworkConfig');
+        
+        if (acestreamStatusElement) {
+            if (data.enabled) {
+                if (data.available) {
+                    acestreamStatusElement.className = 'badge bg-success';
+                    acestreamStatusElement.textContent = 'Online';
+                    
+                    if (acestreamDetailsElement) {
+                        acestreamDetailsElement.classList.remove('d-none');
+                        if (versionElement) versionElement.textContent = data.version || 'Unknown';
+                        if (platformElement) platformElement.textContent = data.platform || 'Unknown';
+                        if (networkElement) networkElement.textContent = data.connected ? 'Connected' : 'Disconnected';
+                    }
+                    
+                    if (configAcestreamStatus) configAcestreamStatus.textContent = 'Enabled and Online';
+                } else {
+                    acestreamStatusElement.className = 'badge bg-danger';
+                    acestreamStatusElement.textContent = 'Offline';
+                    if (acestreamDetailsElement) acestreamDetailsElement.classList.add('d-none');
+                    if (configAcestreamStatus) configAcestreamStatus.textContent = 'Enabled but Offline';
+                }
+            } else {
+                acestreamStatusElement.className = 'badge bg-secondary';
+                acestreamStatusElement.textContent = 'Disabled';
+                if (acestreamDetailsElement) acestreamDetailsElement.classList.add('d-none');
+                if (configAcestreamStatus) configAcestreamStatus.textContent = 'Disabled';
+            }
+        }
+    } catch (error) {
+        console.error('Error checking Acestream Engine status:', error);
+        const acestreamStatusElement = document.getElementById('acestreamStatusConfig');
+        if (acestreamStatusElement) {
+            acestreamStatusElement.className = 'badge bg-warning';
+            acestreamStatusElement.textContent = 'Error';
+        }
+    }
+}
+
+// Check Acestream Engine status with optional loading indicator
+async function checkAcestreamStatus(showLoadingIndicator = false) {
+    try {
+        if (showLoadingIndicator) showLoading();
+        await updateAcestreamStatus();
+    } finally {
+        if (showLoadingIndicator) hideLoading();
     }
 }
 
