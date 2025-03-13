@@ -6,6 +6,7 @@ from app.repositories import SettingsRepository
 from app.utils.config import Config
 from app.extensions import db
 import logging
+from app.services.acestream_status_service import AcestreamStatusService
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,18 @@ rescrape_interval_model = api.model('RescrapeInterval', {
 acexy_status_model = api.model('AcexyStatus', {
     'enabled': fields.Boolean(description='Whether Acexy is enabled'),
     'available': fields.Boolean(description='Whether Acexy is available'),
-    'message': fields.String(description='Status message')
+    'message': fields.String(description='Status message'),
+    'active_streams': fields.Integer(description='Number of active streams')
+})
+
+acestream_status_model = api.model('AcestreamStatus', {
+    'enabled': fields.Boolean(description='Whether Acestream Engine is enabled'),
+    'available': fields.Boolean(description='Whether Acestream Engine is available'),
+    'message': fields.String(description='Status message'),
+    'version': fields.String(description='Acestream Engine version'),
+    'platform': fields.String(description='Platform'),
+    'playlist_loaded': fields.Boolean(description='Whether playlist is loaded'),
+    'connected': fields.Boolean(description='Whether engine is connected to network')
 })
 
 @api.route('/base_url')
@@ -109,22 +121,54 @@ class AcexyStatus(Resource):
             return {
                 "enabled": False,
                 "available": False,
-                "message": "Acexy is not enabled in this environment"
+                "message": "Acexy is not enabled in this environment",
+                "active_streams": 0
             }
         
         try:
-            acexy_url = "http://localhost:8080/ace/status"
+            # Get port from ACEXY_LISTEN_ADDR or default to 8080
+            acexy_addr = os.environ.get('ACEXY_LISTEN_ADDR', ':8080')
+            # If the address starts with a colon, it's just a port
+            if acexy_addr.startswith(':'):
+                acexy_port = acexy_addr[1:]  # Remove the colon
+                acexy_url = f"http://localhost:{acexy_port}/ace/status"
+            else:
+                acexy_url = f"http://localhost{acexy_addr}/ace/status"
+            
             response = requests.get(acexy_url, timeout=2)
-            return {
-                "enabled": True,
-                "available": response.status_code == 200,
-                "message": "Acexy is available" if response.status_code == 200 else "Acexy is not responding"
-            }
-        except:
+            
+            if response.status_code == 200:
+                try:
+                    # Try to parse as JSON first
+                    data = response.json()
+                    active_streams = data.get('streams', 0)
+                except ValueError:
+                    # If not valid JSON, try to parse as plain int
+                    try:
+                        active_streams = int(response.text)
+                    except ValueError:
+                        logger.warning(f"Could not parse Acexy response: {response.text}")
+                        active_streams = 0
+                
+                return {
+                    "enabled": True,
+                    "available": True,
+                    "message": f"Acexy is available ({active_streams} active streams)",
+                    "active_streams": active_streams
+                }
             return {
                 "enabled": True,
                 "available": False,
-                "message": "Could not connect to Acexy service"
+                "message": f"Acexy is not responding properly (HTTP {response.status_code})",
+                "active_streams": 0
+            }
+        except Exception as e:
+            logger.error(f"Error connecting to Acexy service: {str(e)}")
+            return {
+                "enabled": True,
+                "available": False,
+                "message": "Could not connect to Acexy service",
+                "active_streams": 0
             }
 
 @api.route('/setup_completed')
@@ -150,3 +194,17 @@ class SetupCompleted(Resource):
         except Exception as e:
             logger.error(f"Error updating setup status: {e}")
             api.abort(500, str(e))
+
+@api.route('/acestream_status')
+class AcestreamStatus(Resource):
+    @api.doc('get_acestream_status')
+    @api.marshal_with(acestream_status_model)
+    def get(self):
+        """Get Acestream Engine status."""
+        config = Config()
+        
+        # Create service instance and get status
+        service = AcestreamStatusService(engine_url=config.ace_engine_url)
+        status = service.check_status()
+        
+        return status
