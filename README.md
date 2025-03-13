@@ -217,7 +217,8 @@ docker run -d \
 
 Access the web interface at `http://localhost:8000`
 
-![image](https://github.com/user-attachments/assets/5043a652-dc5a-4227-904e-21828fac089e)
+![image](https://github.com/user-attachments/assets/17e000b7-20de-4a80-a990-9d0d5b225754)
+![image](https://github.com/user-attachments/assets/17006755-43ff-4817-be2c-36397cf9631b)
 
 #### Dashboard
 
