@@ -20,22 +20,22 @@ class ChannelRepository(BaseRepository[AcestreamChannel]):
             logger.error(f"Error getting channel {channel_id}: {e}")
             return None
 
-    def create(self, channel_id: str, name: str, **kwargs) -> Optional[AcestreamChannel]:
+    def create(self, channel_id, name, source_url=None, scraped_url_id=None, **kwargs):
         """Create a new channel."""
         try:
             channel = AcestreamChannel(
                 id=channel_id,
                 name=name,
-                added_at=datetime.now(timezone.utc),
-                status='active',
-                **kwargs
+                source_url=source_url,
+                scraped_url_id=scraped_url_id,
+                **kwargs  # Support additional fields like group, logo, etc.
             )
             self._db.session.add(channel)
             self._db.session.commit()
             return channel
-        except SQLAlchemyError as e:
+        except Exception as e:
             self._db.session.rollback()
-            logger.error(f"Error creating channel {channel_id}: {e}")
+            logger.error(f"Error creating channel: {e}", exc_info=True)
             return None
 
     def update(self, channel: AcestreamChannel, **kwargs) -> Optional[AcestreamChannel]:
@@ -72,6 +72,18 @@ class ChannelRepository(BaseRepository[AcestreamChannel]):
             logger.error(f"Error getting active channels: {e}")
             return []
 
+    def get_channel_sources(self) -> List[str]:
+        """Get all unique channel sources."""
+        try:
+            sources = self._db.session.query(AcestreamChannel.source_url)\
+            .filter(AcestreamChannel.source_url.isnot(None))\
+            .distinct()\
+            .all()
+            return [source[0] for source in sources if source[0]]
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting channel sources: {e}")
+            return []
+    
     def get_by_source(self, source_url: str) -> List[AcestreamChannel]:
         """Get all channels from a specific source URL."""
         try:

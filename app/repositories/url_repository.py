@@ -97,3 +97,63 @@ class URLRepository(BaseRepository[ScrapedURL]):
             self._db.session.commit()
             return url_obj
         return None
+
+    def get_or_create_by_type_and_url(self, url_type: str, url: str, enabled: bool = True, trigger_scrape: bool = False) -> ScrapedURL:
+        """Get a URL by type and URL, or create it if it doesn't exist."""
+        try:
+            # Try to find existing URL
+            scraped_url = self.model.query.filter_by(url=url, url_type=url_type).first()
+            
+            # If it doesn't exist, create it
+            if not scraped_url:
+                from datetime import datetime, timezone
+                scraped_url = self.model(
+                    url=url,
+                    url_type=url_type,
+                    added_at=datetime.now(timezone.utc),
+                    enabled=enabled,
+                    status='pending' if trigger_scrape else 'ok'
+                )
+                self._db.session.add(scraped_url)
+                self._db.session.commit()
+                logger.info(f"Created new {url_type} URL: {url}")
+            
+            return scraped_url
+        except SQLAlchemyError as e:
+            self._db.session.rollback()
+            logger.error(f"Error getting or creating URL by type {url_type} and URL {url}: {e}")
+            raise
+    
+    def get_or_create_manual_url(self, base_url: str) -> ScrapedURL:
+        """Get or create a special URL for manually added channels.
+        
+        Args:
+            base_url: The base URL of the application (e.g., http://localhost:8000)
+            
+        Returns:
+            A ScrapedURL object for manually added channels
+        """
+        try:
+            # Try to find existing manual URL
+            manual_url = self.model.query.filter_by(url_type='manual').first()
+            
+            # If it doesn't exist, create it
+            if not manual_url:
+                from datetime import datetime, timezone
+                manual_url = self.model(
+                    url=base_url,
+                    url_type='manual',
+                    added_at=datetime.now(timezone.utc),
+                    enabled=False,  # Disabled so we don't try to scrape our own service
+                    status='ok',
+                    channel_count=0
+                )
+                self._db.session.add(manual_url)
+                self._db.session.commit()
+                logger.info(f"Created new manual URL entry: {base_url}")
+            
+            return manual_url
+        except SQLAlchemyError as e:
+            self._db.session.rollback()
+            logger.error(f"Error getting or creating manual URL: {e}")
+            raise
