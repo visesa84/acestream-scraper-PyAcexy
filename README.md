@@ -4,6 +4,8 @@ A Python-based web scraping application that retrieves Acestream channel informa
 
 [![Release Pipeline](https://github.com/Pipepito/acestream-scraper/actions/workflows/release.yml/badge.svg)](https://github.com/Pipepito/acestream-scraper/actions/workflows/release.yml)
 
+# I do not answer questions outside the discussions section or issues, if you reach me out directly with config issues I will block you.
+
 ## Features
 
 - Scrapes Acestream channel information from multiple URLs
