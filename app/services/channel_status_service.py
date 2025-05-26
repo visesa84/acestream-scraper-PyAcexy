@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 class ChannelStatusService:
     """Service for checking Acestream channel status."""
-    
     def __init__(self):
         config = Config()
         self.ace_engine_url = config.ace_engine_url
         self.timeout = 10
         self.repo = ChannelRepository()  # Create single repository instance
+        self._next_player_id = 0  # Counter for generating unique player IDs
         
     async def check_channel(self, channel: AcestreamChannel) -> bool:
         """Check if a channel is alive by querying the Acestream engine."""
@@ -26,13 +26,14 @@ class ChannelStatusService:
         
         try:
             check_time = datetime.now(timezone.utc)
-            
-            # Build status check URL
+              # Build status check URL with unique player ID
+            self._next_player_id = (self._next_player_id + 1) % 100000  # Roll over at 100000
             status_url = f"{self.ace_engine_url}/ace/getstream"
             params = {
                 'id': channel.id,
                 'format': 'json',
-                'method': 'get_status'
+                'method': 'get_status',
+                'pid': str(self._next_player_id)
             }
             
             async with aiohttp.ClientSession() as session:
@@ -86,7 +87,7 @@ class ChannelStatusService:
                 self.repo.update_channel_status(channel.id, False, check_time, str(e))
             return False
             
-    async def check_channels(self, channels: List[AcestreamChannel], concurrency: int = 5):
+    async def check_channels(self, channels: List[AcestreamChannel], concurrency: int = 2):
         """Check multiple channels concurrently with rate limiting."""
         semaphore = asyncio.Semaphore(concurrency)
         
@@ -95,13 +96,13 @@ class ChannelStatusService:
                 try:
                     # Check the channel
                     result = await self.check_channel(channel)
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(2)
                     return result
                 except Exception as e:
                     logger.error(f"Error checking channel {channel.id}: {e}")
                     return False
         
-        chunk_size = 10
+        chunk_size = 2
         results = []
         
         for i in range(0, len(channels), chunk_size):

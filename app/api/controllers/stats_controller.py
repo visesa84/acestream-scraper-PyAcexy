@@ -40,9 +40,13 @@ class Stats(Resource):
             channels = AcestreamChannel.query.all()
             config = Config()
             
-            total_checked = sum(1 for ch in channels if ch.last_checked is not None)
-            online_channels = sum(1 for ch in channels if ch.is_online)
+            # Calculate channel stats more robustly
+            total_channels = len(channels)
+            channels_checked = sum(1 for ch in channels if ch.last_checked is not None)
+            channels_online = sum(1 for ch in channels if ch.last_checked is not None and ch.is_online is True)
+            channels_offline = sum(1 for ch in channels if ch.last_checked is not None and ch.is_online is False)
             
+            # Build URL stats
             url_stats = []
             for url in urls:
                 channel_count = AcestreamChannel.query.filter_by(source_url=url.url).count()
@@ -67,10 +71,10 @@ class Stats(Resource):
             
             return {
                 'urls': url_stats,
-                'total_channels': len(channels),
-                'channels_checked': total_checked,
-                'channels_online': online_channels,
-                'channels_offline': total_checked - online_channels,
+                'total_channels': total_channels,
+                'channels_checked': channels_checked, 
+                'channels_online': channels_online,
+                'channels_offline': channels_offline,
                 'base_url': config.base_url,
                 'ace_engine_url': config.ace_engine_url,
                 'rescrape_interval': config.rescrape_interval,
@@ -79,3 +83,33 @@ class Stats(Resource):
             }
         except Exception as e:
             api.abort(500, f"Error retrieving statistics: {str(e)}")
+
+@api.route('/tv-channels/')
+class TVChannelStats(Resource):
+    @api.doc('get_tv_channel_stats')
+    def get(self):
+        """Get statistics about TV channels"""
+        try:
+            from app.models.tv_channel import TVChannel
+            from sqlalchemy import func
+            
+            # Get total count
+            total_count = TVChannel.query.count()
+            
+            # Get active count
+            active_count = TVChannel.query.filter_by(is_active=True).count()
+            
+            # Get count with EPG
+            with_epg_count = TVChannel.query.filter(TVChannel.epg_id.isnot(None)).count()
+            
+            # Get total acestreams associated with TV channels
+            acestreams_count = AcestreamChannel.query.filter(AcestreamChannel.tv_channel_id.isnot(None)).count()
+            
+            return {
+                'total': total_count,
+                'active': active_count,
+                'with_epg': with_epg_count,
+                'acestreams': acestreams_count
+            }
+        except Exception as e:
+            api.abort(500, f"Error retrieving TV channel statistics: {str(e)}")
