@@ -112,13 +112,13 @@ class AcestreamSearchService:
                                 # Create a processed result with the required fields
                                 processed_item = {
                                     'name': result.get('name', 'Unnamed Channel'),
-                                    'id': item.get('infohash', ''), # Use the infohash as ID
+                                    'id': self.get_content_id(item.get('infohash')), # Get ID from infohash
                                     'categories': item.get('categories', []),
                                     'bitrate': item.get('bitrate', 0)
                                 }
                                 # Add any other useful fields from the item
                                 for key, value in item.items():
-                                    if key not in processed_item and key != 'infohash':
+                                    if key not in processed_item:
                                         processed_item[key] = value
                                 
                                 processed_results.append(processed_item)
@@ -209,4 +209,22 @@ class AcestreamSearchService:
         """
         if url.startswith('acestream://'):
             return url.split('acestream://')[1]
+        return None
+    
+    def get_content_id(self, infohash: str) -> Optional[str]:
+        try:
+            url = f"{self.engine_url}/server/api"
+            params = {
+                "api_version": 3,
+                "method": "get_content_id",
+                "infohash": infohash
+            }
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("result", {}).get("content_id")
+            else:
+                logger.error(f"Failed to get content_id for infohash {infohash}: status {response.status_code}")
+        except Exception as e:
+            logger.error(f"Exception in get_content_id for infohash {infohash}: {e}")
         return None
