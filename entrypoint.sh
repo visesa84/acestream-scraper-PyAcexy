@@ -82,13 +82,13 @@ if [ "$ENABLE_ACEXY" = "true" ]; then
         exit 1
     fi
     
-    echo "Starting Acexy proxy..."
+    echo "Starting PyAcexy proxy..."
     export ACEXY_HOST
     export ACEXY_PORT
-    /usr/local/bin/acexy >> "$LOG_DIR/acexy.log" 2>&1 &
-    echo "Acexy proxy logs available at $LOG_DIR/acexy.log"
+    python /usr/local/bin/pyacexy >> "$LOG_DIR/pyacexy.log" 2>&1 &
+    echo "PyAcexy proxy logs available at $LOG_DIR/pyacexy.log"
 else
-    echo "Acexy is disabled."
+    echo "PyAcexy is disabled."
 fi
 
 # Start ZeroNet in the background
@@ -105,17 +105,15 @@ sleep 10
 # Start Flask app with Gunicorn
 cd /app
 echo "Starting Flask application on port $FLASK_PORT..."
-exec gunicorn \
-    --bind "0.0.0.0:$FLASK_PORT" \
-    --workers 3 \
-    --timeout 300 \
-    --keep-alive 5 \
-    --worker-class uvicorn.workers.UvicornWorker \
+exec gunicorn --bind "0.0.0.0:$FLASK_PORT" \
+    --workers 1 \
+    --threads 12 \
+    --worker-class gthread \
+    --timeout 30 \
+    --keep-alive 2 \
     --log-level info \
-    --access-logfile "$LOG_DIR/gunicorn-access.log" \
-    --error-logfile "$LOG_DIR/gunicorn-error.log" \
-    "wsgi:asgi_app" &
-GUNICORN_PID=$!
+    "wsgi:flask_app"
+
 echo "Flask application logs available at $LOG_DIR/gunicorn-access.log and $LOG_DIR/gunicorn-error.log"
 
 # Monitor processes
