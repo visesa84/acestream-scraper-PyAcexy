@@ -132,11 +132,10 @@ ENV ACEXY_LISTEN_ADDR=":8080"
 ENV ACEXY_HOST="localhost"
 ENV ACEXY_PORT=6878
 ENV ALLOW_REMOTE_ACCESS="no"
-ENV ACEXY_NO_RESPONSE_TIMEOUT=15
-ENV ACEXY_BUFFER_SIZE=5
+ENV ACEXY_BUFFER_SIZE=10
 ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so.2"
 ENV MALLOC_CONF="dirty_decay_ms:1000,muzzy_decay_ms:1000"
-ENV EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error"
+ENV EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10"
 
 # Final image with application code
 FROM base
@@ -174,6 +173,7 @@ EXPOSE 6878
 
 # Set the volume
 VOLUME ["/app/ZeroNet/data"]
+VOLUME ["/app/config"]
 
 # Make sure WORKDIR is set correctly
 WORKDIR /app
