@@ -454,6 +454,6 @@ Contributions are welcome! Please fork the repository and create a pull request 
 ## Acknowledgements
 
 Special thanks to the developers of Flask, BeautifulSoup, SQLAlchemy, and other dependencies used in this project.
-- [Acestream-scrapper](https://github.com/Pipepito/acestream-scraper) - Enhanced Acestream Scrapper interface
+- [Acestream-scrapper](https://github.com/Pipepito/acestream-scraper) - Enhanced Acestream Scraper interface
 - [Pyacexy](https://github.com/wafy80/pyacexy) - Enhanced Acestream proxy interface with Python
 - [Acestream-http-proxy](https://github.com/martinbjeldbak/acestream-http-proxy) - HTTP proxy for Acestream
