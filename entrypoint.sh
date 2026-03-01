@@ -67,15 +67,17 @@ fi
 # Start Acestream Engine if enabled
 if [ "$ENABLE_ACESTREAM_ENGINE" = "true" ]; then
     echo "Starting Acestream engine..."
+	# Definir valores por defecto si las variables están vacías
+    BUFFER=${ACEXY_BUFFER_SIZE:-30}
     if [ "$ALLOW_REMOTE_ACCESS" = "yes" ]; then
         EXTRA_FLAGS="$EXTRA_FLAGS --bind-all"
     fi
-    /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS >> "$LOG_DIR/acestream.log" 2>&1 &  
+    /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $BUFFER >> "$LOG_DIR/acestream.log" 2>&1 &  
     sleep 3 # Brief pause to allow Acestream engine to start
     echo "Acestream engine logs available at $LOG_DIR/acestream.log"
 fi
 
-# Start Acexy if enabled
+# Start PyAcexy if enabled
 if [ "$ENABLE_ACEXY" = "true" ]; then
     if [ "$ENABLE_ACESTREAM_ENGINE" = "false" ] && [ "$ACEXY_HOST" = "localhost" ] && [ "$ACEXY_PORT" = "6878" ]; then
         echo "ERROR: When Acestream Engine is disabled, you must specify ACEXY_HOST and ACEXY_PORT other than localhost to connect to an external Acestream Engine instance"
