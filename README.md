@@ -106,6 +106,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
    - Acestream Engine settings
    - Source URLs to scrape
    - Rescrape interval
+   - Enable or disable Acestream check status
 
 3. **Alternative: Manual configuration**
 
