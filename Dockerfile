@@ -1,39 +1,24 @@
-# Use a multi-stage build for Acexy
-FROM golang:1.22 AS acexy-builder
-WORKDIR /app
-RUN git clone https://github.com/Javinator9889/acexy.git . && \
-    cd acexy && \
-    CGO_ENABLED=0 GOOS=linux go build -o /acexy
-
-# Create base image with all dependencies
+# --- STAGE 1: Base image con todas las dependencias ---
 FROM python:3.10-slim AS base
 
-# Add metadata labels
-LABEL maintainer="pipepito" \
-      description="Base image for Acestream channel scraper" \
+LABEL maintainer="visesa" \
+      description="Base image for Acestream channel scraper with pyacexy" \
       version="1.2.14"
 
-# Set the working directory
 WORKDIR /app
-
-# Create the config directory
 RUN mkdir -p /app/config
 
-# Install system dependencies
+# Instalar dependencias del sistema necesarias para compilar
 RUN apt-get update && apt-get install -y \
-    wget \
-    curl \
-    gnupg \
-    gcc \
-    python3-dev \
-    build-essential \
-    tor
+    wget curl gnupg gcc python3-dev build-essential \
+    tor git lsb-release apt-transport-https ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Add TOR configuration
+# Configuración de TOR
 RUN echo "ControlPort 9051" >> /etc/tor/torrc && \
     echo "CookieAuthentication 1" >> /etc/tor/torrc
 
-# Install ZeroNet dependencies with specific versions
+# 1. Actualizar herramientas de construcción
 RUN pip install --no-cache-dir \
     "msgpack-python" \
     "gevent==22.10.2" \
@@ -53,20 +38,26 @@ RUN pip install --no-cache-dir \
     "defusedxml" \
     "rsa"
 
-# Download and install ZeroNet
+# --- INSTALACIÓN DE PYACEXY ---
+RUN git clone https://github.com/wafy80/pyacexy /opt/pyacexy && \
+    cd /opt/pyacexy && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Descargar e instalar ZeroNet
 RUN mkdir -p ZeroNet && \
     wget https://github.com/zeronet-conservancy/zeronet-conservancy/archive/refs/heads/master.tar.gz -O ZeroNet.tar.gz && \
     tar xvf ZeroNet.tar.gz && \
     mv zeronet-conservancy-master/* ZeroNet/ && \
     rm -rf ZeroNet.tar.gz zeronet-conservancy-master
 
-ENV ACESTREAM_VERSION="3.2.3_ubuntu_22.04_x86_64_py3.10"
+# Instalar Acestream Engine
+ENV ACESTREAM_VERSION="3.2.11_ubuntu_22.04_x86_64_py3.10"
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Install acestream dependencies
 RUN apt-get update \
   && apt-get install --no-install-recommends -y \
-      python3.10 ca-certificates wget sudo \
+      ca-certificates wget sudo \
   && rm -rf /var/lib/apt/lists/* \
   #
   # Download acestream
@@ -78,10 +69,6 @@ RUN apt-get update \
   && pushd /opt/acestream || exit \
   && bash ./install_dependencies.sh \
   && popd || exit
-
-# Copy the acexy binary from the builder stage
-COPY --from=acexy-builder /acexy /usr/local/bin/acexy
-RUN chmod +x /usr/local/bin/acexy
 
 # Install Cloudflare WARP dependencies
 RUN apt-get update && apt-get install -y \
@@ -98,8 +85,31 @@ RUN curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflare-client.list
 
 # Install Cloudflare WARP
-RUN apt-get update && apt-get install -y cloudflare-warp \
+RUN apt-get update \
+	&& apt-get install -y libcap2-bin --no-install-recommends \
+	&& cp /bin/true /sbin/setcap \
+    && cp /bin/true /usr/sbin/setcap \
+	&& apt-get install -y cloudflare-warp \
+	&& rm /usr/sbin/setcap \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy the pyacexy
+RUN cp /opt/pyacexy/pyacexy/proxy.py /usr/local/bin/pyacexy && \
+	cp /opt/pyacexy/pyacexy/aceid.py /usr/local/bin/aceid.py && \
+	cp /opt/pyacexy/pyacexy/copier.py /usr/local/bin/copier.py && \
+	sed -i '4i import sys' /usr/local/bin/pyacexy && \
+    sed -i '9i sys.path.append(os.path.dirname(os.path.realpath(__file__)))' /usr/local/bin/pyacexy && \
+    # Opción 1: Reemplazar las importaciones relativas (quitar el punto)
+    sed -i 's/from \.aceid/from aceid/g' /usr/local/bin/pyacexy && \
+    sed -i 's/from \.copier/from copier/g' /usr/local/bin/pyacexy
+
+# FORZAMOS PERMISOS DE EJECUCIÓN
+RUN chmod +x /usr/local/bin/pyacexy
+RUN chmod +x /usr/local/bin/aceid.py
+RUN chmod +x /usr/local/bin/copier.py
+
+# Instalar la librería
+RUN apt-get update && apt-get install -y libjemalloc2 && rm -rf /var/lib/apt/lists/*
 
 # Clean up APT in base image
 RUN apt-get clean && \
@@ -109,21 +119,23 @@ RUN apt-get clean && \
 ENV DOCKER_ENV=true
 ENV TZ='Europe/Madrid'
 ENV ENABLE_TOR=false
-ENV ENABLE_ACEXY=false
-ENV ENABLE_ACESTREAM_ENGINE=false
+ENV ENABLE_ACEXY=true
+ENV ENABLE_ACESTREAM_ENGINE=true
 ENV ENABLE_WARP=false
 ENV WARP_ENABLE_NAT=true
 ENV WARP_ENABLE_IPV6=false
 ENV ACESTREAM_HTTP_PORT=6878
+ENV ACESTREAM_HTTP_HOST=ACEXY_HOST
 ENV IPV6_DISABLED=true
 ENV FLASK_PORT=8000
 ENV ACEXY_LISTEN_ADDR=":8080"
 ENV ACEXY_HOST="localhost"
 ENV ACEXY_PORT=6878
 ENV ALLOW_REMOTE_ACCESS="no"
-ENV ACEXY_NO_RESPONSE_TIMEOUT=15s
-ENV ACEXY_BUFFER_SIZE=5MiB
-ENV ACESTREAM_HTTP_HOST=ACEXY_HOST
+ENV ACEXY_NO_RESPONSE_TIMEOUT=15
+ENV ACEXY_BUFFER_SIZE=5
+ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so.2"
+ENV MALLOC_CONF="dirty_decay_ms:1000,muzzy_decay_ms:1000"
 ENV EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error"
 
 # Final image with application code
@@ -143,6 +155,9 @@ COPY migrations_app.py manage.py ./
 COPY wsgi.py ./
 COPY app/ ./app/
 
+# FORZAMOS PERMISOS DE EJECUCIÓN
+RUN chmod +x /app/entrypoint.sh /app/healthcheck.sh /app/warp-setup.sh
+
 # Install the application dependencies
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r requirements-prod.txt
@@ -153,13 +168,18 @@ EXPOSE 43110
 EXPOSE 43111
 EXPOSE 26552
 EXPOSE 8080
-EXPOSE 8621
+EXPOSE 8621/tcp
+EXPOSE 8621/udp
+EXPOSE 6878
 
 # Set the volume
 VOLUME ["/app/ZeroNet/data"]
 
 # Make sure WORKDIR is set correctly
 WORKDIR /app
+
+# FORZAMOS PERMISOS DE EJECUCIÓN
+RUN chmod -R 755 /app
 
 # Define the healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
