@@ -26,8 +26,6 @@ A Python-based web scraping application that retrieves Acestream channel informa
 - **API documentation via OpenAPI/Swagger UI**
 - **Enhanced health checking for all components**
 
-# [Detailed Wiki](https://github.com/visesa84/acestream-scraper-PyAcexy/wiki)
-
 ## Quick Start
 
 ### Using Docker Compose (Easiest Method)
