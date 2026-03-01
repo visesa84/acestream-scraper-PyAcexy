@@ -82,17 +82,17 @@ A Python-based web scraping application that retrieves Acestream channel informa
 
 ### Using Docker (Alternative)
 
-[Image in Docker Hub](https://hub.docker.com/r/visesa84/acestream-scraper-py)
+[Image in Docker Hub](https://hub.docker.com/r/visesa84/acestream-scraper-pyacexy)
 
 1. **Pull and run the container:**
 
    ```bash
-   docker pull visesa84/acestream-scraper-py:latest
+   docker pull visesa84/acestream-scraper-pyacexy:latest
    docker run -d \
      -p 8000:8000 \
      -v "${PWD}/config:/app/config" \
      --name acestream-scraper \
-     visesa84/acestream-scraper-py:latest
+     visesa84/acestream-scraper-pyacexy:latest
    ```
 
 2. **Access the setup wizard:**
