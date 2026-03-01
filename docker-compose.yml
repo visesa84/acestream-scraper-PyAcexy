@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: pipepito/acestream-scraper:latest
+    image: visesa84/acestream-scraper-pyacexy:latest
     container_name: acestream-scraper
     environment:
       - TZ=Europe/Madrid
@@ -18,8 +18,8 @@ services:
       - ACEXY_HOST=localhost
       - ACEXY_PORT=6878
       - ALLOW_REMOTE_ACCESS=no
-      - ACEXY_NO_RESPONSE_TIMEOUT=15s
-      - ACEXY_BUFFER_SIZE=5MiB
+      - ACEXY_NO_RESPONSE_TIMEOUT=15
+      - ACEXY_BUFFER_SIZE=5
       - ACESTREAM_HTTP_HOST=ACEXY_HOST
       - ENABLE_WARP=true
     ports:
