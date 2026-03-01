@@ -46,12 +46,12 @@ A Python-based web scraping application that retrieves Acestream channel informa
          - ENABLE_ACESTREAM_ENGINE=true
          - ACESTREAM_HTTP_PORT=6878
          - FLASK_PORT=8000
-         - _LISTEN_ADDR=:8080
-         - _HOST=localhost
-         - _PORT=6878
+         - LISTEN_ADDR=:8080
+         - HOST=localhost
+         - PORT=6878
          - ALLOW_REMOTE_ACCESS=no
-         - _NO_RESPONSE_TIMEOUT=15
-         - _BUFFER_SIZE=5
+         - NO_RESPONSE_TIMEOUT=15
+         - BUFFER_SIZE=5
          - ACESTREAM_HTTP_HOST=localhost
        ports:
          - "8000:8000"  # Flask application
