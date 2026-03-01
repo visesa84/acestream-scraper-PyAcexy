@@ -227,8 +227,6 @@ docker run -d \
    ```bash
    mkdir -p config
    # Create config/config.json as shown above
-   python run_dev.py  # For development
-   # or
    python wsgi.py     # For production
    ```
 
@@ -440,14 +438,6 @@ The container includes comprehensive health checking:
 - Automatic monitoring of internal services
 - Graceful handling of service dependencies
 
-### Development
-
-For development, use `run_dev.py` which provides:
-
-- Debug mode
-- Auto-reloading
-- Windows compatibility
-
 ## Architecture
 
 The application follows a service-oriented architecture with:
@@ -458,34 +448,6 @@ The application follows a service-oriented architecture with:
 - Async task management
 - Clear separation of concerns
 - Integration with external services (Acestream, Pyacexy, ZeroNet)
-
-## Testing
-
-### Setup
-
-```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run specific test file
-pytest tests/unit/test_repositories.py
-
-# Run with coverage report
-pytest --cov=app tests/
-```
-
-### Test Structure
-
-- `tests/unit`: Unit tests for individual components
-- `tests/integration`: Integration tests for API endpoints
-- `tests/conftest.py`: Test fixtures and configuration
 
 ## Contributing
 
