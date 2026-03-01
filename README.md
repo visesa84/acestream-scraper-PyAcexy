@@ -15,11 +15,11 @@ A Python-based web scraping application that retrieves Acestream channel informa
 - Database migrations support
 - Service-oriented architecture
 - Repository pattern for data access
-- **Built-in Acestream engine with Acexy proxy (optional)**
+- **Built-in Acestream engine with PyAcexy proxy (optional)**
 - **Support for external Acestream Engine instances**
 - **Cloudflare WARP integration for enhanced privacy and geo-unblocking**
 - Channel status checking
-- Acexy status display in the dashboard
+- PyAcexy status display in the dashboard
 - **Interactive setup wizard for easy configuration**
 - **Channel search functionality**
 - **Automatic rescraping at configurable intervals**
@@ -44,20 +44,20 @@ A Python-based web scraping application that retrieves Acestream channel informa
        environment:
          - TZ=Europe/Madrid
          - ENABLE_TOR=false
-         - ENABLE_ACEXY=true
+         - ENABLE_=true
          - ENABLE_ACESTREAM_ENGINE=true
          - ACESTREAM_HTTP_PORT=6878
          - FLASK_PORT=8000
-         - ACEXY_LISTEN_ADDR=:8080
-         - ACEXY_HOST=localhost
-         - ACEXY_PORT=6878
+         - _LISTEN_ADDR=:8080
+         - _HOST=localhost
+         - _PORT=6878
          - ALLOW_REMOTE_ACCESS=no
-         - ACEXY_NO_RESPONSE_TIMEOUT=15
-         - ACEXY_BUFFER_SIZE=5
+         - _NO_RESPONSE_TIMEOUT=15
+         - _BUFFER_SIZE=5
          - ACESTREAM_HTTP_HOST=localhost
        ports:
          - "8000:8000"  # Flask application
-         - "8080:8080"  # Acexy proxy
+         - "8080:8080"  #  proxy
          - "8621:8621"  # Acestream P2P Port
          - "43110:43110"  # ZeroNet UI
          - "43111:43111"  # ZeroNet peer
@@ -84,17 +84,17 @@ A Python-based web scraping application that retrieves Acestream channel informa
 
 ### Using Docker (Alternative)
 
-[Image in Docker Hub](https://hub.docker.com/r/visesa84/acestream-scraper-pyacexy)
+[Image in Docker Hub](https://hub.docker.com/r/visesa84/acestream-scraper-py)
 
 1. **Pull and run the container:**
 
    ```bash
-   docker pull visesa84/acestream-scraper-pyacexy:latest
+   docker pull visesa84/acestream-scraper-py:latest
    docker run -d \
      -p 8000:8000 \
      -v "${PWD}/config:/app/config" \
      --name acestream-scraper \
-     visesa84/acestream-scraper-pyacexy:latest
+     visesa84/acestream-scraper-py:latest
    ```
 
 2. **Access the setup wizard:**
@@ -123,9 +123,9 @@ A Python-based web scraping application that retrieves Acestream channel informa
    }
    ```
 
-### Running with Acexy and Internal Acestream Engine
+### Running with PyAcexy and Internal Acestream Engine
 
-The image includes an embedded Acestream engine with the Acexy proxy interface, which provides a user-friendly web UI:
+The image includes an embedded Acestream engine with the PyAcexy proxy interface, which provides a user-friendly web UI:
 
 ```bash
 docker run -d \
@@ -139,11 +139,11 @@ docker run -d \
   visesa84/acestream-scraper-pyacexy:latest
 ```
 
-Acexy only exposes an status endpoint available at `http://localhost:8080/ace/status`.
+PyAcexy only exposes an status endpoint available at `http://localhost:8080/ace/status`.
 
 ### Using with External Acestream Engine
 
-You can connect the Acexy proxy to an external Acestream Engine instance:
+You can connect the PyAcexy proxy to an external Acestream Engine instance:
 
 ```bash
 docker run -d \
@@ -293,10 +293,10 @@ The application provides OpenAPI/Swagger documentation:
 
 ### Pyacexy Interface
 
-If you enabled Acexy (recommended):
+If you enabled PyAcexy (recommended):
 
 - Access the Pyacexy interface at: `http://localhost:8080`
-- Check Acexy status directly in the main dashboard
+- Check PyAcexy status directly in the main dashboard
 - Manage your Acestream connections through a user-friendly web interface
 
 ## Configuration
@@ -323,12 +323,12 @@ Configure through the setup wizard or directly in `config.json`:
 - `ACESTREAM_HTTP_PORT`: Port for Acestream engine (default: `6878`)
 - `ACESTREAM_HTTP_HOST`: Host for Acestream engine (default: uses value of `ACEXY_HOST`)
 
-#### Pyacexy Configuration
+#### PyAcexy Configuration
 
-Acexy provides an enhanced proxy interface for Acestream, with a web UI for better management:
+PyAcexy provides an enhanced proxy interface for Acestream, with a web UI for better management:
 
 - `ENABLE_ACEXY`: Set to `true` to enable Pyacexy proxy (default: `false`)
-- `ACEXY_LISTEN_ADDR`: Address for Acexy to listen on (default: `:8080`)
+- `ACEXY_LISTEN_ADDR`: Address for PyAcexy to listen on (default: `:8080`)
 - `ACEXY_HOST`: Hostname of the Acestream Engine to connect to (default: `localhost`)
 - `ACEXY_PORT`: Port of the Acestream Engine to connect to (default: `6878`)
 - `ALLOW_REMOTE_ACCESS`: Set to `yes` to allow external connections (default: `no`)
@@ -367,7 +367,7 @@ To use this feature:
 - `8000`: Main web interface (configurable via `FLASK_PORT`)
 - `43110`: ZeroNet web interface (if ZeroNet enabled)
 - `43111`: ZeroNet transport port (if ZeroNet enabled)
-- `8080`: Acexy web interface (if enabled)
+- `8080`: PyAcexy web interface (if enabled)
 - `6878`: Acestream HTTP API port (configurable via `ACESTREAM_HTTP_PORT`)
 - `26552`: Additional ZeroNet peer port
 
@@ -435,7 +435,7 @@ The application includes proper headers handling for running behind a reverse pr
 The container includes comprehensive health checking:
 
 - Main application health check at `/health` endpoint providing detailed status
-- Acexy health check (if enabled)
+- PyAcexy health check (if enabled)
 - Acestream Engine health check (if enabled)
 - Automatic monitoring of internal services
 - Graceful handling of service dependencies
