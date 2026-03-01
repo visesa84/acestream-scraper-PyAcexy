@@ -2,8 +2,6 @@
 
 A Python-based web scraping application that retrieves Acestream channel information and generates M3U playlists. Built using Flask, BeautifulSoup, and SQLAlchemy.
 
-[![Release Pipeline](https://github.com/Pipepito/acestream-scraper/actions/workflows/release.yml/badge.svg)](https://github.com/Pipepito/acestream-scraper/actions/workflows/release.yml)
-
 # I do not answer questions outside the discussions section or issues, if you reach me out directly with config issues I will block you.
 
 ## Features
@@ -28,7 +26,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 - **API documentation via OpenAPI/Swagger UI**
 - **Enhanced health checking for all components**
 
-# [Detailed Wiki](https://github.com/Pipepito/acestream-scraper/wiki)
+# [Detailed Wiki](https://github.com/visesa84/acestream-scraper-PyAcexy/wiki)
 
 ## Quick Start
 
@@ -41,7 +39,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 
    services:
      acestream-scraper:
-       image: pipepito/acestream-scraper:latest
+       image: visesa84/acestream-scraper-pyacexy:latest
        container_name: acestream-scraper
        environment:
          - TZ=Europe/Madrid
@@ -54,8 +52,8 @@ A Python-based web scraping application that retrieves Acestream channel informa
          - ACEXY_HOST=localhost
          - ACEXY_PORT=6878
          - ALLOW_REMOTE_ACCESS=no
-         - ACEXY_NO_RESPONSE_TIMEOUT=15s
-         - ACEXY_BUFFER_SIZE=5MiB
+         - ACEXY_NO_RESPONSE_TIMEOUT=15
+         - ACEXY_BUFFER_SIZE=5
          - ACESTREAM_HTTP_HOST=localhost
        ports:
          - "8000:8000"  # Flask application
@@ -86,17 +84,17 @@ A Python-based web scraping application that retrieves Acestream channel informa
 
 ### Using Docker (Alternative)
 
-[Image in Docker Hub](https://hub.docker.com/r/pipepito/acestream-scraper)
+[Image in Docker Hub](https://hub.docker.com/r/visesa84/acestream-scraper-pyacexy)
 
 1. **Pull and run the container:**
 
    ```bash
-   docker pull pipepito/acestream-scraper:latest
+   docker pull visesa84/acestream-scraper-pyacexy:latest
    docker run -d \
      -p 8000:8000 \
      -v "${PWD}/config:/app/config" \
      --name acestream-scraper \
-     pipepito/acestream-scraper:latest
+     visesa84/acestream-scraper-pyacexy:latest
    ```
 
 2. **Access the setup wizard:**
@@ -137,7 +135,7 @@ docker run -d \
   -e ALLOW_REMOTE_ACCESS=yes \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 Acexy only exposes an status endpoint available at `http://localhost:8080/ace/status`.
@@ -156,7 +154,7 @@ docker run -d \
   -e ACEXY_PORT=6878 \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### Using with ZeroNet
@@ -173,7 +171,7 @@ docker run -d \
   -v "${PWD}/config:/app/config" \
   -v "${PWD}/zeronet_data:/app/ZeroNet/data" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 #### Running with TOR enabled
@@ -187,7 +185,7 @@ docker run -d \
   -v "${PWD}/config:/app/config" \
   -v "${PWD}/zeronet_data:/app/ZeroNet/data" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### Using with Cloudflare WARP
@@ -202,7 +200,7 @@ docker run -d \
   -e ENABLE_WARP=true \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 > **Note:** WARP integration requires additional capabilities (`NET_ADMIN` and `SYS_ADMIN`) to create and manage network tunnels.
@@ -216,7 +214,7 @@ docker run -d \
 2. **Setup:**
 
    ```bash
-   git clone https://github.com/Pipepito/acestream-scraper.git
+   git clone https://github.com/visesa84/acestream-scraper-pyacexy.git
    cd acestream-scraper
    python3 -m venv venv
    source venv/bin/activate  # On Windows use: venv\Scripts\activate
@@ -280,7 +278,7 @@ To use in your media player (like VLC):
 3. Paste the URL and play
 
 **URL Formatting Note:**
-- When using Acexy proxy (port 8080), stream URLs are formatted as `{base_url}{channel_id}`
+- When using Pyacexy proxy (port 8080), stream URLs are formatted as `{base_url}{channel_id}`
 - For all other configurations, `&pid={local_id}` is automatically appended to each stream URL: `{base_url}{channel_id}&pid={local_id}`
 - This ensures proper channel identification in various player environments
 
@@ -292,11 +290,11 @@ The application provides OpenAPI/Swagger documentation:
 - Interactive API documentation for developers
 - Test endpoints directly from the browser
 
-### Acexy Interface
+### Pyacexy Interface
 
 If you enabled Acexy (recommended):
 
-- Access the Acexy interface at: `http://localhost:8080`
+- Access the Pyacexy interface at: `http://localhost:8080`
 - Check Acexy status directly in the main dashboard
 - Manage your Acestream connections through a user-friendly web interface
 
@@ -309,7 +307,8 @@ Configure through the setup wizard or directly in `config.json`:
 - `urls`: Array of URLs to scrape for Acestream channels
 - `base_url`: Base URL format for playlist generation (e.g., `acestream://` or `http://localhost:6878/ace/getstream?id=`)
 - `ace_engine_url`: URL of your Acestream Engine instance (default: `http://127.0.0.1:6878`)
-- `rescrape_interval`: How often to refresh URLs (in hours, default: 24)
+- `checkstatus_interval`: How often to refresh All Check Status Channel (in hours, default: 24)
+- `checkstatus_enabled`: Enable or disable Check Status Channels (default: True)
 
 ### Environment Variables
 
@@ -323,17 +322,17 @@ Configure through the setup wizard or directly in `config.json`:
 - `ACESTREAM_HTTP_PORT`: Port for Acestream engine (default: `6878`)
 - `ACESTREAM_HTTP_HOST`: Host for Acestream engine (default: uses value of `ACEXY_HOST`)
 
-#### Acexy Configuration
+#### Pyacexy Configuration
 
 Acexy provides an enhanced proxy interface for Acestream, with a web UI for better management:
 
-- `ENABLE_ACEXY`: Set to `true` to enable Acexy proxy (default: `false`)
+- `ENABLE_ACEXY`: Set to `true` to enable Pyacexy proxy (default: `false`)
 - `ACEXY_LISTEN_ADDR`: Address for Acexy to listen on (default: `:8080`)
 - `ACEXY_HOST`: Hostname of the Acestream Engine to connect to (default: `localhost`)
 - `ACEXY_PORT`: Port of the Acestream Engine to connect to (default: `6878`)
 - `ALLOW_REMOTE_ACCESS`: Set to `yes` to allow external connections (default: `no`)
-- `ACEXY_NO_RESPONSE_TIMEOUT`: Timeout for Acestream responses (default: `15s`)
-- `ACEXY_BUFFER_SIZE`: Buffer size for data transfers (default: `5MiB`)
+- `ACEXY_NO_RESPONSE_TIMEOUT`: Timeout for Acestream responses (default: `15`)
+- `ACEXY_BUFFER_SIZE`: Buffer size for data transfers (default: `5`)
 
 #### WARP Configuration
 
@@ -413,7 +412,7 @@ docker run -d \
   -p 43110:43110 \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### Running Behind a Reverse Proxy
@@ -457,7 +456,7 @@ The application follows a service-oriented architecture with:
 - Migrations support for database changes
 - Async task management
 - Clear separation of concerns
-- Integration with external services (Acestream, Acexy, ZeroNet)
+- Integration with external services (Acestream, Pyacexy, ZeroNet)
 
 ## Testing
 
@@ -491,13 +490,9 @@ pytest --cov=app tests/
 
 Contributions are welcome! Please fork the repository and create a pull request with your changes.
 
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
 ## Acknowledgements
 
 Special thanks to the developers of Flask, BeautifulSoup, SQLAlchemy, and other dependencies used in this project.
-
-- [Acexy](https://github.com/Javinator9889/acexy) - Enhanced Acestream proxy interface
+- [Acestream-scrapper](https://github.com/Pipepito/acestream-scraper) - Enhanced Acestream Scrapper interface
+- [Pyacexy](https://github.com/wafy80/pyacexy) - Enhanced Acestream proxy interface with Python
 - [Acestream-http-proxy](https://github.com/martinbjeldbak/acestream-http-proxy) - HTTP proxy for Acestream
