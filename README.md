@@ -50,8 +50,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
          - HOST=localhost
          - PORT=6878
          - ALLOW_REMOTE_ACCESS=no
-         - NO_RESPONSE_TIMEOUT=15
-         - BUFFER_SIZE=5
+         - BUFFER_SIZE=10
          - ACESTREAM_HTTP_HOST=localhost
        ports:
          - "8000:8000"  # Flask application
