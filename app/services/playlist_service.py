@@ -42,6 +42,8 @@ class PlaylistService:
         
         # Query channels from the database
         channels = self._get_channels(search_term)
+        # Ordenamos por nombre ignorando mayúsculas/minúsculas
+        channels = sorted(channels, key=lambda c: (c.name or "").lower())
         
         # Track used names and their counts
         name_counts = {}
@@ -54,16 +56,16 @@ class PlaylistService:
             stream_url = self._format_stream_url(channel.id, local_id)
             
             # Handle duplicate names
-            base_name = channel.name
-            #if base_name in name_counts:
+            base_name = (channel.name or "").strip()
+            if base_name in name_counts:
                 # Increment the counter for this name
-                #name_counts[base_name] += 1
+                name_counts[base_name] += 1
                 # For duplicates, append the counter value (2, 3, etc.)
-                #display_name = f"{base_name} {name_counts[base_name]}"
-            #else:
+                display_name = f"{base_name} #{name_counts[base_name]}"
+            else:
                 # First occurrence - use original name and initialize counter
-            name_counts[base_name] = 1
-            display_name = base_name
+                name_counts[base_name] = 1
+                display_name = base_name
             
             # Add metadata if available
             metadata = []
@@ -79,7 +81,7 @@ class PlaylistService:
             # Create EXTINF line with metadata
             extinf = '#EXTINF:-1'
             if metadata:
-                extinf += f' {"".join(metadata)}'
+                extinf += f' {" ".join(metadata)}'
             extinf += f',{display_name}'
             
             playlist_lines.append(extinf)
@@ -416,7 +418,7 @@ class PlaylistService:
                 else:
                     if base_name in name_counts:
                         name_counts[base_name] += 1
-                        display_name = f"{base_name} {name_counts[base_name]}"
+                        display_name = f"{base_name} #{name_counts[base_name]}"
                     else:
                         name_counts[base_name] = 1
                         display_name = base_name
@@ -449,7 +451,7 @@ class PlaylistService:
                 
                 extinf = '#EXTINF:-1'
                 if metadata:
-                    extinf += f' {"".join(metadata)}'
+                    extinf += f' {" ".join(metadata)}'
                 extinf += f',{display_name}'
                 
                 playlist_lines.append(extinf)
@@ -466,7 +468,7 @@ class PlaylistService:
             unassigned_acestreams = unassigned_query.all()
             
             # Find the next available channel number
-            next_channel_number = 9000  # Start unassigned streams at 9000
+            next_channel_number = 1  # Start unassigned streams
             if sorted_channels:
                 max_channel_number = max((c.channel_number or 0) for c in sorted_channels)
                 next_channel_number = max(next_channel_number, max_channel_number + 1)
@@ -484,7 +486,7 @@ class PlaylistService:
                 # Handle duplicate names
                 if display_name in name_counts:
                     name_counts[display_name] += 1
-                    display_name = f"{display_name} {name_counts[display_name]}"
+                    display_name = f"{display_name} #{name_counts[display_name]}"
                 else:
                     name_counts[display_name] = 1
                 
@@ -510,7 +512,7 @@ class PlaylistService:
                 
                 extinf = '#EXTINF:-1'
                 if metadata:
-                    extinf += f' {"".join(metadata)}'
+                    extinf += f' {" ".join(metadata)}'
                 extinf += f',{display_name}'
                 
                 playlist_lines.append(extinf)
@@ -520,22 +522,39 @@ class PlaylistService:
         
     def generate_online_only_playlist(self, search_term=None):
         playlist_lines = ['#EXTM3U']
+        
+        # Obtenemos los canales online
         online_acestreams = AcestreamChannel.query.filter(
             AcestreamChannel.status == 'active',
             AcestreamChannel.is_online == True
         ).all()
+
+        online_acestreams = sorted(online_acestreams, key=lambda x: (x.name or "").lower())
         
+        name_counts = {}
         local_id = 0
+        
         for acestream in online_acestreams:
-            if search_term and search_term.lower() not in acestream.name.lower():
+            # Filtro de búsqueda
+            if search_term and search_term.lower() not in (acestream.name or "").lower():
                 continue
 
             stream_url = self._format_stream_url(acestream.id, local_id)
             local_id += 1
+
+            base_name = (acestream.name or "").strip()
             
-            display_name = acestream.name
-            metadata = [f'tvg-name="{display_name}"']
+            if base_name in name_counts:
+                name_counts[base_name] += 1
+                display_name = f"{base_name} #{name_counts[base_name]}"
+            else:
+                name_counts[base_name] = 1
+                display_name = base_name
             
+            # Metadatos
+            metadata = []            
+            if acestream.tvg_name:
+                metadata.append(f'tvg-name="{acestream.tvg_name}"')
             if acestream.tvg_id:
                 metadata.append(f'tvg-id="{acestream.tvg_id}"')
             if acestream.logo:
@@ -543,7 +562,9 @@ class PlaylistService:
             if acestream.group:
                 metadata.append(f'group-title="{acestream.group}"')
             
+            # Construcción de la línea (Ya corregida con el espacio del join)
             extinf = f'#EXTINF:-1 {" ".join(metadata)},{display_name}'
+            
             playlist_lines.append(extinf)
             playlist_lines.append(stream_url)
                     
