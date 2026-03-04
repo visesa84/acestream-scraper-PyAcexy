@@ -1,4 +1,4 @@
-name: Manual Release Pipeline
+name: Crear Release Solo Texto
 
 on:
   push:
@@ -7,27 +7,16 @@ on:
 
 jobs:
   create-release:
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
     permissions:
-      contents: write 
+      contents: write
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
 
-      - name: Preparar carpeta y comprimir
-        run: |
-          # Creamos una carpeta con el nombre de la versión para que no salgan los archivos sueltos
-          mkdir ${{ github.ref_name }}
-          # Copiamos todo excepto carpetas ocultas de git/github
-          cp -r . ${{ github.ref_name }}/ || true
-          rm -rf ${{ github.ref_name }}/.git ${{ github.ref_name }}/.github
-          # Creamos el ZIP
-          zip -r ${{ github.ref_name }}.zip ${{ github.ref_name }}
-
       - name: Crear GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "${{ github.ref_name }}.zip"
           generateReleaseNotes: true
           prerelease: ${{ contains(github.ref_name, 'beta') }}
           token: ${{ secrets.GITHUB_TOKEN }}
