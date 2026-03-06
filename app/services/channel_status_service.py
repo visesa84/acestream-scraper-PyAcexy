@@ -32,7 +32,13 @@ class ChannelStatusService:
 
     async def check_channel(self, channel_id: str) -> bool:
         from flask import current_app
+        from app import db
+        
         session = await self.get_session()
+        if not session:
+            logger.error("No session available")
+            return False
+
         is_online = False
         is_already_watching = False
         command_url = None
@@ -41,56 +47,51 @@ class ChannelStatusService:
         check_time = datetime.utcnow()
         
         try:
-            # 1. PREGUNTA AL PROXY (8080)
+            # 1. PROXY
             try:
                 status_url = f"{self.proxy_url}/ace/status"
                 async with session.get(status_url, params={'id': channel_id}, timeout=3) as st_resp:
                     if st_resp.status == 200:
-                        status_data = await st_resp.json()
+                        status_data = await st_resp.json() or {}
                         if status_data.get('clients', 0) > 0:
-                            logger.info(f"[PROXY] {channel_id} already in use.")
                             is_already_watching = True
                             is_online = True
-            except Exception as e:
-                logger.debug(f"Proxy status not available: {e}")
+            except Exception:
+                pass
 
-            # 2. CHEQUEO EN EL MOTOR (6878)
+            # 2. MOTOR
             if not is_already_watching:
-                get_stream_url = f"{self.ace_engine_url}/ace/getstream"
-                params = {'id': channel_id, 'format': 'json'}
-                
-                async with session.get(get_stream_url, params=params) as response:
+                get_url = f"{self.ace_engine_url}/ace/getstream"
+                async with session.get(get_url, params={'id': channel_id, 'format': 'json'}) as response:
+                    data = {}
                     if response.status == 200:
-                        data = await response.json()
-                        resp_data = data.get('response', {})
-                        stat_url = resp_data.get('stat_url')
-                        command_url = resp_data.get('command_url')
-                        
-                        if stat_url:
-                            for attempt in range(5):
-                                await asyncio.sleep(3)
-                                async with session.get(stat_url) as s_resp:
-                                    if s_resp.status == 200:
-                                        s_data = await s_resp.json()
-                                        if s_data and s_data.get('response'):
-                                            download_speed = int(s_data['response'].get('speed_down', 0))
-                                            if download_speed > 0:
-                                                is_online = True
-                                                break
-                            
-                            if not is_online:
-                                error_msg = f"Speed 0 after {attempt+1} attempts"
-                        else:
-                            error_msg = data.get('error', "No stat_url in response")
+                        data = await response.json() or {}
+                    
+                    resp_data = data.get('response') or {} 
+                    stat_url = resp_data.get('stat_url')
+                    command_url = resp_data.get('command_url')
+                    
+                    if stat_url:
+                        for attempt in range(5):
+                            await asyncio.sleep(3)
+                            async with session.get(stat_url) as s_resp:
+                                if s_resp.status == 200:
+                                    s_data = await s_resp.json() or {}
+                                    res_obj = s_data.get('response') or {}
+                                    download_speed = int(res_obj.get('speed_down', 0))
+                                    if download_speed > 0:
+                                        is_online = True
+                                        break
+                        if not is_online:
+                            error_msg = f"Speed 0 after {attempt+1} attempts"
                     else:
-                        error_msg = f"HTTP Error {response.status}"
+                        error_msg = data.get('error', "No stat_url")
 
         except Exception as e:
-            logger.error(f"Error comprobando {channel_id}: {e}")
+            logger.error(f"Error checking {channel_id}: {e}")
             error_msg = str(e)
         
         finally:
-            # 3. CIERRE EN EL MOTOR (6878)
             if command_url and not is_already_watching:
                 try:
                     async with session.get(f"{command_url}?method=stop", timeout=2) as r:
@@ -98,7 +99,7 @@ class ChannelStatusService:
                 except:
                     pass
 
-        # 4. PERSISTENCIA EN DB
+        # 3. DB
         try:
             with current_app.app_context():
                 db_channel = db.session.get(AcestreamChannel, channel_id)
@@ -111,7 +112,7 @@ class ChannelStatusService:
                     logger.info(f"[{'ONLINE' if is_online else 'OFFLINE'}] {channel_id} | {download_speed} KB/s")
         except Exception as db_e:
             logger.error(f"DB Error: {db_e}")
-			
+            
         return is_online
 
     async def check_channels(self, channels: List[AcestreamChannel]):
@@ -177,7 +178,6 @@ async def check_channel_status(channel_id_or_obj: Union[str, AcestreamChannel, D
                 raise ValueError(f"Channel {channel_id} not found")
                 
             # 3. Realizar el chequeo asíncrono
-            # Pasamos solo el channel_id (string) como acordamos para evitar DetachedInstanceError
             is_online = await service.check_channel(channel_id)
             
             # Recargar para obtener datos frescos tras el commit del servicio
@@ -206,7 +206,7 @@ def start_background_check(channels, manager=None):
     # Bloqueo atómico para evitar doble hilo
     with _status_lock:
         if _is_running:
-            logger.warning("Intento de ejecución duplicada abortado.")
+            logger.warning("Attempted duplicate execution aborted.")
             return
         _is_running = True
 
@@ -242,7 +242,7 @@ def start_background_check(channels, manager=None):
                 _is_running = False
             if manager:
                 manager.is_checking_status = False
-            logger.info("Proceso de fondo finalizado.")
+            logger.info("Background process completed.")
 
     def run_thread():
         loop = asyncio.new_event_loop()

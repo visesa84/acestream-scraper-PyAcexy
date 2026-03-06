@@ -3,7 +3,7 @@ FROM python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Base image for Acestream channel scraper with pyacexy" \
-      version="1.2.14"
+      version="1.2"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -101,7 +101,10 @@ RUN cp /opt/pyacexy/pyacexy/proxy.py /usr/local/bin/pyacexy && \
     sed -i '9i sys.path.append(os.path.dirname(os.path.realpath(__file__)))' /usr/local/bin/pyacexy && \
     # Opción 1: Reemplazar las importaciones relativas (quitar el punto)
     sed -i 's/from \.aceid/from aceid/g' /usr/local/bin/pyacexy && \
-    sed -i 's/from \.copier/from copier/g' /usr/local/bin/pyacexy
+    sed -i 's/from \.copier/from copier/g' /usr/local/bin/pyacexy && \
+	# --- INYECTAR MÉTODO STATUS EN PYACEXY ---
+	sed -i '/async def start_server/i \    async def handle_status(self, request: web.Request) -> web.Response:\n        status_data = {"total_active_streams": len(self.streams), "streams": []}\n        async with self.streams_lock:\n            for key, ongoing in self.streams.items():\n                status_data["streams"].append({"id": key, "clients": len(ongoing.clients), "is_stopping": ongoing.stopping})\n        return web.json_response(status_data)\n' /usr/local/bin/pyacexy
+
 
 # FORZAMOS PERMISOS DE EJECUCIÓN
 RUN chmod +x /usr/local/bin/pyacexy
@@ -127,7 +130,7 @@ ENV WARP_ENABLE_IPV6=false
 ENV ACESTREAM_HTTP_PORT=6878
 ENV ACESTREAM_HTTP_HOST=ACEXY_HOST
 ENV IPV6_DISABLED=true
-ENV FLASK_PORT=8000
+ENV FLASK_PORT=8040
 ENV ACEXY_LISTEN_ADDR=":8080"
 ENV ACEXY_HOST="localhost"
 ENV ACEXY_PORT=6878
@@ -135,7 +138,7 @@ ENV ALLOW_REMOTE_ACCESS="no"
 ENV ACEXY_BUFFER_SIZE=10
 ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so.2"
 ENV MALLOC_CONF="dirty_decay_ms:1000,muzzy_decay_ms:1000"
-ENV EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10"
+ENV EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory"
 
 # Final image with application code
 FROM base
@@ -162,7 +165,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r requirements-prod.txt
 
 # Expose the ports
-EXPOSE 8000
+EXPOSE 8040
 EXPOSE 43110
 EXPOSE 43111
 EXPOSE 26552

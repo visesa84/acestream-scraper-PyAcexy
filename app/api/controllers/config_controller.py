@@ -7,6 +7,7 @@ from app.utils.config import Config
 from app.extensions import db
 import logging
 from app.services.acestream_status_service import AcestreamStatusService
+from app.models.acestream_channel import AcestreamChannel
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +34,17 @@ checkstatus_interval_model = api.model('CheckStatusInterval', {
     'enabled': fields.Boolean(required=True, description='Whether automatic status check is enabled')
 })
 
+stream_info_model = api.model('StreamInfo', {
+    'id': fields.String(attribute='id'),
+    'nombre': fields.String(attribute='nombre')
+})
+
 acexy_status_model = api.model('AcexyStatus', {
-    'enabled': fields.Boolean(description='Whether Acexy is enabled'),
-    'available': fields.Boolean(description='Whether Acexy is available'),
-    'message': fields.String(description='Status message'),
-    'active_streams': fields.Integer(description='Number of active streams')
+    'enabled': fields.Boolean(),
+    'available': fields.Boolean(),
+    'message': fields.String(),
+    'active_streams': fields.Integer(),
+    'streams_list': fields.List(fields.Nested(stream_info_model)) # Importante: Nested
 })
 
 acestream_status_model = api.model('AcestreamStatus', {
@@ -162,9 +169,9 @@ class AcexyStatus(Resource):
     @api.doc('get_acexy_status')
     @api.marshal_with(acexy_status_model)
     def get(self):
-        """Get Acexy status with global error handling."""
+        """Obtiene el estado de Acexy y la lista de IDs que se están reproduciendo."""
         try:
-            # 1. Verificar si está habilitado en el entorno
+            # 1. Verificar si está habilitado en las variables de entorno
             enabled_env = os.environ.get('ENABLE_ACEXY', 'false').lower() == 'true'
             
             if not enabled_env:
@@ -172,62 +179,71 @@ class AcexyStatus(Resource):
                     "enabled": False,
                     "available": False,
                     "message": "Acexy is not enabled in this environment",
-                    "active_streams": 0
+                    "active_streams": 0,
+                    "streams_list": []
                 }
             
-            # 2. Construir la URL de Acexy
+            # 2. Construir la URL de consulta al proxy (puerto por defecto 8080)
             acexy_addr = os.environ.get('ACEXY_LISTEN_ADDR', ':8080')
-            if acexy_addr.startswith(':'):
-                acexy_url = f"http://localhost{acexy_addr}/ace/status"
-            else:
-                acexy_url = f"http://localhost{acexy_addr}/ace/status"
+            # Extraemos el puerto (ej: de ":8080" a "8080")
+            port = acexy_addr.split(':')[-1] if ':' in acexy_addr else "8080"
+            acexy_url = f"http://localhost:{port}/ace/status"
             
-            # 3. Petición al servicio Acexy con timeout corto
+            # 3. Petición al servicio Acexy (inyectado previamente vía Docker)
             try:
                 response = requests.get(acexy_url, timeout=2)
                 
                 if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        active_streams = data.get('streams', 0)
-                    except (ValueError, AttributeError):
-                        # Fallback si no es JSON (intento parsear texto plano)
-                        try:
-                            active_streams = int(response.text)
-                        except ValueError:
-                            active_streams = 0
+                    data = response.json()
+                    active_count = data.get('total_active_streams', 0)
+                    raw_streams = data.get('streams', [])
+                    
+                    enriched_list = []
+                    for s in raw_streams:
+                        sid = s['id']
+                        # Buscamos por la columna 'id' del modelo AcestreamChannel
+                        canal = AcestreamChannel.query.filter_by(id=sid).first()
+                        
+                        enriched_list.append({
+                            "id": sid,
+                            "nombre": canal.name if canal else f"Desconocido ({sid[:6]}...)"
+                        })
                     
                     return {
                         "enabled": True,
                         "available": True,
-                        "message": f"Acexy online ({active_streams} streams)",
-                        "active_streams": active_streams
+                        "message": f"Acexy online ({active_count} streams)",
+                        "active_streams": active_count,
+                        "streams_list": enriched_list
                     }
                 
-                # Respuesta no es 200
+                # Error HTTP (ej: 404 o 500)
                 return {
                     "enabled": True,
                     "available": False,
                     "message": f"Acexy error HTTP {response.status_code}",
-                    "active_streams": 0
+                    "active_streams": 0,
+                    "streams_list": []
                 }
 
             except requests.exceptions.RequestException as e:
+                logger.warning(f"Unable to connect to PyAcexy: {str(e)}")
                 return {
                     "enabled": True,
                     "available": False,
                     "message": "Acexy connection timeout/error",
-                    "active_streams": 0
+                    "active_streams": 0,
+                    "streams_list": []
                 }
 
         except Exception as e:
-            # Error de última instancia: Garantizamos devolver JSON, nunca HTML
-            logger.error(f"Fatal error in AcexyStatus API: {str(e)}")
+            logger.error(f"Fatal error in PyAcexyStatus API: {str(e)}")
             return {
                 "enabled": True,
                 "available": False,
                 "message": "Internal API Error",
-                "active_streams": 0
+                "active_streams": 0,
+                "streams_list": []
             }
 
 @api.route('/setup_completed')
