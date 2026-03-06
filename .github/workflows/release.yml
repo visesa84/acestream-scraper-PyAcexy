@@ -1,4 +1,4 @@
-name: Crear Release Solo Texto
+name: Release y Docker Hub
 
 on:
   push:
@@ -6,17 +6,47 @@ on:
       - 'v*'
 
 jobs:
-  create-release:
+  release-and-docker:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extraer mensaje manual del tag
+        id: tag_message
+        run: |
+          MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
+          [ -z "$MESSAGE" ] && MESSAGE="Nueva versión ${{ github.ref_name }}"
+          echo "manual_text<<EOF" >> $GITHUB_OUTPUT
+          echo "$MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Login en Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/acestream-scraper-pyacexy:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/acestream-scraper-pyacexy:${{ github.ref_name }}
 
       - name: Crear GitHub Release
         uses: ncipollo/release-action@v1
         with:
+          body: |
+            ${{ steps.tag_message.outputs.manual_text }}
+            
+            ---
           generateReleaseNotes: true
-          prerelease: ${{ contains(github.ref_name, 'beta') }}
+          prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
