@@ -27,7 +27,7 @@ Docker is a platform that uses containerization technology to package applicatio
 - Manages individual containers
 - Best for simple deployments
 - Uses CLI commands to configure containers
-- Example: `docker run -p 8000:8000 pipepito/acestream-scraper:latest`
+- Example: `docker run -p 8040:8040 visesa84/acestream-scraper-pyacexy:latest`
 
 ### Docker Compose
 - Manages multi-container applications
@@ -41,12 +41,12 @@ For Acestream Scraper, Docker Compose is recommended as it makes managing all co
 
 ### Pull the Image
 ```bash
-docker pull pipepito/acestream-scraper:latest
+docker pull visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### Run the Container
 ```bash
-docker run -d -p 8000:8000 --name acestream-scraper pipepito/acestream-scraper:latest
+docker run -d -p 8040:8040 --name acestream-scraper visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### View Running Containers
@@ -71,7 +71,7 @@ docker rm acestream-scraper
 
 ### Update to Latest Version
 ```bash
-docker pull pipepito/acestream-scraper:latest
+docker pull visesa84/acestream-scraper-pyacexy:latest
 docker stop acestream-scraper
 docker rm acestream-scraper
 # Run the container again with your preferred configuration
@@ -111,7 +111,7 @@ These volumes should be mounted to local directories to ensure your data persist
 
 Example:
 ```bash
-docker run -d -p 8000:8000 -v "${PWD}/config:/app/config" pipepito/acestream-scraper:latest
+docker run -d -p 8040:8040 -v "${PWD}/config:/app/config" visesa84/acestream-scraper-pyacexy:latest
 ```
 
 This mounts your local `./config` directory to the container's `/app/config` directory.

@@ -226,7 +226,7 @@ class PlaylistService:
         xml_lines = [
             '<?xml version="1.0" encoding="utf-8" ?>',
             '<!DOCTYPE tv SYSTEM "xmltv.dtd">',
-            '<tv generator-info-name="Acestream Scraper EPG Generator" generator-info-url="https://github.com/pipepito/acestream-scraper">'
+            '<tv generator-info-name="Acestream Scraper EPG Generator" generator-info-url="https://github.com/visesa84/acestream-scraper-PyAcexy">'
         ]
         
         # Get TV channels with filters

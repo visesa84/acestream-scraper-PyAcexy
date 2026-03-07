@@ -36,7 +36,7 @@ docker-compose up -d
 
 If using Docker directly:
 ```bash
-docker pull pipepito/acestream-scraper:latest
+docker pull visesa84/acestream-scraper-pyacexy:latest
 docker stop acestream-scraper
 docker rm acestream-scraper
 # Then run the container again with your preferred configuration
@@ -65,6 +65,9 @@ It depends on your setup:
 ### How often does it update the channel list?
 By default, it rescans URLs every 24 hours. You can change this with the `rescrape_interval` setting in the configuration page or by setting the value when going through the setup wizard.
 
+### How often does it update the status channel?
+By default, it rescans streams every 24 hours. You can change this with the `checkstatus_interval` setting in the configuration page or by setting the value when going through the setup wizard.
+
 ### What is Cloudflare WARP and why would I use it?
 Cloudflare WARP is a privacy-focused VPN-like service that encrypts your traffic and routes it through Cloudflare's global network. Benefits include:
 - **Privacy**: Encrypts your internet traffic
@@ -79,10 +82,10 @@ docker run -d \
   --cap-add NET_ADMIN \
   --cap-add SYS_ADMIN \
   -e ENABLE_WARP=true \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### What WARP modes are available?
@@ -128,7 +131,7 @@ This flexibility allows you to:
 
 ### How do I access the web interface?
 After starting the container, open your browser and navigate to:
-- `http://localhost:8000` (or replace localhost with your server IP)
+- `http://localhost:8040` (or replace localhost with your server IP)
 
 ### Why are some channels offline?
 Acestream channels may go offline for several reasons:
@@ -144,7 +147,7 @@ Acestream channels may go offline for several reasons:
 4. Click "Add"
 
 ### How do I use the playlist with my media player?
-1. Copy the playlist URL: `http://[your-server]:8000/playlist.m3u`
+1. Copy the playlist URL: `http://[your-server]:8040/playlist.m3u`
 2. In your media player (like VLC), select "Open Network Stream" or similar
 3. Paste the URL and play
 4. For auto-updating playlists, use the URL directly rather than downloading the file
@@ -163,7 +166,7 @@ Check the logs for errors:
 docker logs acestream-scraper
 ```
 Common issues include:
-- Port conflicts (another service using port 8000)
+- Port conflicts (another service using port 8040)
 - Invalid environment variables
 - Insufficient permissions on mounted volumes
 
@@ -213,8 +216,8 @@ Solutions to try:
 Yes, but you need to change the port mappings to avoid conflicts. For example:
 ```yaml
 ports:
-  - "8001:8000"  # First instance
-  - "8002:8000"  # Second instance
+  - "8041:8000"  # First instance
+  - "8042:8000"  # Second instance
 ```
 
 ### How can I contribute to the project?

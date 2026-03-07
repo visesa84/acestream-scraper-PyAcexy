@@ -87,7 +87,7 @@ If you prefer using Docker without Docker Compose, follow these steps:
 ### Basic Installation
 
 ```bash
-docker pull pipepito/acestream-scraper:latest
+docker pull visesa84/acestream-scraper-pyacexy:latest
 docker run -d \
   -p 8040:8040 \
   -v "${PWD}/config:/app/config" \

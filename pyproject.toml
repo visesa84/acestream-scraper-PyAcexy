@@ -7,11 +7,9 @@ name = "acestream-scraper"
 version = "0.1.0"
 description = "Acestream channel scraper with ZeroNet support"
 readme = "README.md"
-authors = [{name = "pipepito"}]
-license = {text = "MIT"}
+authors = [{name = "visesa84"}]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [

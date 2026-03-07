@@ -13,14 +13,14 @@ Before submitting a new bug report, please:
    docker-compose up -d
    
    # If using Docker directly
-   docker pull pipepito/acestream-scraper:latest
+   docker pull visesa84/acestream-scraper-pyacexy:latest
    docker stop acestream-scraper
    docker rm acestream-scraper
    # Then run your container again with the same configuration
    ```
 
 2. Check the [FAQ](FAQ.md) to see if your issue is already addressed
-3. Search existing [GitHub Issues](https://github.com/Pipepito/acestream-scraper/issues) to avoid duplicates
+3. Search existing [GitHub Issues](https://github.com/visesa84/acestream-scraper-PyAcexy/issues) to avoid duplicates
 4. Try basic troubleshooting steps mentioned in the FAQ
 
 ## Required Information
@@ -29,9 +29,9 @@ Before submitting a new bug report, please:
 
 Always include the exact version you're using:
 
-- **Docker image tag**: (e.g., `pipepito/acestream-scraper:latest`, `pipepito/acestream-scraper:1.2.3`)
+- **Docker image tag**: (e.g., `visesa84/acestream-scraper-pyacexy:latest`, `visesa84/acestream-scraper-pyacexy:1.2.3`)
   ```bash
-  docker inspect pipepito/acestream-scraper:latest | grep "Image ID"
+  docker inspect visesa84/acestream-scraper-pyacexy:latest | grep "Image ID"
   ```
   
 - **Version in web interface**: Check the footer of the web interface which should display the current version
@@ -63,7 +63,7 @@ Describe how you deployed the application:
 1. **Clear summary**: A concise description of the issue
 2. **Steps to reproduce**: Numbered, specific steps that lead to the bug
    ```
-   1. Navigate to http://localhost:8000
+   1. Navigate to http://localhost:8040
    2. Click on "Add URL"
    3. Enter URL: example.com
    4. Click submit
@@ -105,7 +105,7 @@ docker exec acestream-scraper cat /app/logs/app.log
 ### Health Check Information
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8040/health
 ```
 
 ## Common Debugging Steps
@@ -134,7 +134,7 @@ Try these steps to gather more information about your issue:
 
 ## Submitting Your Bug Report
 
-1. Go to [GitHub Issues](https://github.com/Pipepito/acestream-scraper/issues)
+1. Go to [GitHub Issues](https://github.com/visesa84/acestream-scraper-PyAcexy/issues)
 2. Click "New Issue"
 3. Choose "Bug Report" template if available
 4. Fill in the details using the information you've gathered
