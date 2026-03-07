@@ -9,22 +9,31 @@ services:
     container_name: acestream-scraper
     environment:
       - TZ=Europe/Madrid
-      - ENABLE_TOR=true
+      - ENABLE_TOR=false
       - ENABLE_ACEXY=true
       - ENABLE_ACESTREAM_ENGINE=true
+      - ENABLE_WARP=false
+      - WARP_ENABLE_NAT=true
+      - WARP_ENABLE_IPV6=false
+      - IPV6_DISABLED=true
       - ACESTREAM_HTTP_PORT=6878
-      - FLASK_PORT=8000
+      - ACESTREAM_HTTP_HOST=ACEXY_HOST
+      - FLASK_PORT=8040
       - ACEXY_LISTEN_ADDR=:8080
       - ACEXY_HOST=localhost
       - ACEXY_PORT=6878
       - ALLOW_REMOTE_ACCESS=no
+      - REVERSE_PROXY_USER=
+      - REVERSE_PROXY_PASS=
       - ACEXY_NO_RESPONSE_TIMEOUT=15
       - ACEXY_BUFFER_SIZE=5
-      - ACESTREAM_HTTP_HOST=ACEXY_HOST
-      - ENABLE_WARP=true
+      - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+      - MALLOC_CONF=dirty_decay_ms:1000,muzzy_decay_ms:1000
+      - EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory"
+
     ports:
       - "6878:6878"  # AceStream Engine Port 
-      - "8000:8000"  # Flask application
+      - "8040:8040"  # Flask application
       - "8080:8080"  # Acexy proxy
       - "8621:8621"  # Acestream P2P Port
       - "43110:43110"  # ZeroNet UI

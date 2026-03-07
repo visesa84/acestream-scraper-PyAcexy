@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse, quote
 from typing import List, Dict, Optional
 from ..repositories import ChannelRepository
 from app.utils.config import Config
@@ -13,19 +14,42 @@ class PlaylistService:
         self.tv_channel_repository = TVChannelRepository()
         self.tv_channel_service = TVChannelService()
 
-    def _format_stream_url(self, channel_id: str, local_id: int) -> str:
-        """Format stream URL based on base_url configuration."""
-        # Get base_url directly from config instance
-        base_url = getattr(self.config, 'base_url', 'acestream://')
+    def _format_stream_url(self, channel_id: str, local_id: int, base_url: str = None) -> str:
+        # 1. Obtener host y limpiar
+        host = (base_url or getattr(self.config, 'base_url', 'http://localhost:8080')).rstrip('/')
+        parsed = urlparse(host)
         
-        # Check if PID parameter should be added
-        should_add_pid = getattr(self.config, 'addpid', False)
-                
-        # Don't add pid if addpid is False
-        if should_add_pid:
-            return f'{base_url}{channel_id}&pid={local_id}'
-        else:            
-            return f'{base_url}{channel_id}'
+        # 2. Definir credenciales de Access List
+        rp_user = os.environ.get('REVERSE_PROXY_USER')
+        rp_pass = os.environ.get('REVERSE_PROXY_PASS')
+        
+        # 2. Escapar caracteres especiales
+        auth_str = ""
+        if rp_user and rp_pass:
+            safe_user = quote(rp_user, safe='')
+            safe_pass = quote(rp_pass, safe='')
+            auth_str = f"{safe_user}:{safe_pass}@"
+
+        # 3. Detectar si es Dominio o IP Local
+        is_ip = any(char.isdigit() for char in (parsed.hostname or "").split('.'))
+
+        if not is_ip and parsed.hostname:
+            # CASO DOMINIO: Forzamos HTTPS e inyectamos el auth_str
+            host = f"https://{auth_str}{parsed.hostname}"
+        else:
+            # CASO IP LOCAL
+            flask_port = os.environ.get('FLASK_PORT', '8040')
+            if f":{flask_port}" in host:
+                host = host.replace(f":{flask_port}", ":8080")
+            if not host.startswith('http'):
+                host = f"http://{host}"
+
+        # 4. Construcción final
+        query = f"id={channel_id}"
+        if getattr(self.config, 'addpid', False):
+            query += f"&pid={local_id}"
+            
+        return f"{host}/ace/getstream?{query}"
 
     def _get_channels(self, search_term: str = None):
         """Retrieve channels from the repository with optional search term."""
@@ -36,7 +60,7 @@ class PlaylistService:
             ).all()
         return self.channel_repository.get_active()
 
-    def generate_playlist(self, search_term=None):
+    def generate_playlist(self, search_term=None, base_url=None):
         """Generate M3U playlist with channels."""
         playlist_lines = ['#EXTM3U']
         
@@ -53,7 +77,7 @@ class PlaylistService:
             #if not channel.is_online:
             #    continue
             # Use _format_stream_url to get the correct URL format
-            stream_url = self._format_stream_url(channel.id, local_id)
+            stream_url = self._format_stream_url(channel.id, local_id, base_url=base_url)
             
             # Handle duplicate names
             base_name = (channel.name or "").strip()
@@ -89,7 +113,7 @@ class PlaylistService:
             
         return '\n'.join(playlist_lines)
     
-    def generate_tv_channels_playlist(self, search_term=None, favorites_only=False):
+    def generate_tv_channels_playlist(self, search_term=None, favorites_only=False, base_url=None):
         """Generate M3U playlist with TV channels using all their acestreams.
         
         Args:
@@ -144,7 +168,7 @@ class PlaylistService:
             
             # Process each acestream for this TV channel
             for stream_index, acestream in enumerate(sorted_acestreams):
-                stream_url = self._format_stream_url(acestream.id, local_id)
+                stream_url = self._format_stream_url(acestream.id, local_id, base_url=base_url)
                 local_id += 1
                 
                 # --- AQUÍ LA SOLUCIÓN: Nombre y EPG siempre limpios ---
@@ -183,7 +207,7 @@ class PlaylistService:
             
         return '\n'.join(playlist_lines)
 
-    def generate_epg_xml(self, search_term=None, favorites_only=False):
+    def generate_epg_xml(self, search_term=None, favorites_only=False, base_url=None):
         """Generate XML EPG guide for channels with EPG data and associated acestreams.
         
         Args:
@@ -354,7 +378,7 @@ class PlaylistService:
         
         return '\n'.join(xml_lines)
     
-    def generate_all_streams_playlist(self, search_term=None, include_unassigned=True):
+    def generate_all_streams_playlist(self, search_term=None, include_unassigned=True, base_url=None):
         """Generate M3U playlist with all acestreams, including both TV channels and unassigned streams.
         
         Args:
@@ -408,7 +432,7 @@ class PlaylistService:
             for stream_index, acestream in enumerate(sorted_acestreams):
                 processed_acestreams.add(acestream.id)
                 
-                stream_url = self._format_stream_url(acestream.id, local_id)
+                stream_url = self._format_stream_url(acestream.id, local_id, base_url=base_url)
                 local_id += 1
                 
                 # Channel numbering and naming
@@ -477,7 +501,7 @@ class PlaylistService:
                 if acestream.id in processed_acestreams:
                     continue
                     
-                stream_url = self._format_stream_url(acestream.id, local_id)
+                stream_url = self._format_stream_url(acestream.id, local_id, base_url=base_url)
                 local_id += 1
                 
                 # Use acestream name or fallback
@@ -520,7 +544,7 @@ class PlaylistService:
             
         return '\n'.join(playlist_lines)
         
-    def generate_online_only_playlist(self, search_term=None):
+    def generate_online_only_playlist(self, search_term=None, base_url=None):
         playlist_lines = ['#EXTM3U']
         
         # Obtenemos los canales online
@@ -539,7 +563,7 @@ class PlaylistService:
             if search_term and search_term.lower() not in (acestream.name or "").lower():
                 continue
 
-            stream_url = self._format_stream_url(acestream.id, local_id)
+            stream_url = self._format_stream_url(acestream.id, local_id, base_url=base_url)
             local_id += 1
 
             base_name = (acestream.name or "").strip()

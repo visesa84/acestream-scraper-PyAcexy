@@ -19,7 +19,7 @@ Acestream Scraper can be configured through the setup wizard or directly by edit
 
 ### Setup Wizard
 
-When first accessing the application at `http://localhost:8000`, you'll be guided through the setup process if no configuration exists:
+When first accessing the application at `http://localhost:8040`, you'll be guided through the setup process if no configuration exists:
 
 1. Configure Base URL format
 2. Set Acestream Engine URL
@@ -48,9 +48,11 @@ Create or edit `config/config.json`:
 - **base_url**: Base URL format for playlist generation
   - `acestream://` - For players with Acestream protocol support
   - `http://localhost:6878/ace/getstream?id=` - For local HTTP streaming
-  - `http://server-ip:acexy_port/ace/getstream?id=` - For using built-in Acexy proxy
+  - `http://server-ip:acexy_port/ace/getstream?id=` - For using built-in PyAcexy proxy
 - **ace_engine_url**: URL of your Acestream Engine instance
 - **rescrape_interval**: Hours between automatic rescans of URLs
+- **checkstatus_interval**: Hours between automatic rescans of streams
+- **checkstatus_enabled**: Enable or disable Task
 
 ## Environment Variables
 
@@ -58,7 +60,7 @@ Create or edit `config/config.json`:
 
 | Variable | Description | Default | Notes |
 |----------|-------------|---------|-------|
-| `FLASK_PORT` | Port the Flask application runs on | `8000` | Can be changed if port 8000 is in use |
+| `FLASK_PORT` | Port the Flask application runs on | `8040` | Can be changed if port 8040 is in use |
 | `FLASK_ENV` | Flask environment mode | `production` | Use `development` for debugging |
 
 ### Acestream Configuration
@@ -70,7 +72,7 @@ Create or edit `config/config.json`:
 | `ACESTREAM_HTTP_HOST` | Host for Acestream engine | Uses `ACEXY_HOST` | Address to access Acestream Engine |
 | `ALLOW_REMOTE_ACCESS` | Allow remote connections to Acestream | `no` | Set to `yes` to allow external connections |
 
-### Acexy Configuration
+### PyAcexy Configuration
 
 | Variable | Description | Default | Notes |
 |----------|-------------|---------|-------|
@@ -79,19 +81,19 @@ Create or edit `config/config.json`:
 | `ACEXY_HOST` | Hostname of Acestream Engine | `localhost` | Hostname or IP where Acestream Engine runs |
 | `ACEXY_PORT` | Port of Acestream Engine | `6878` | Port where Acestream Engine is accessible |
 | `ACEXY_NO_RESPONSE_TIMEOUT` | Timeout for Acestream responses | `15s` | Format: `15s`, `1m`, etc. |
-| `ACEXY_BUFFER_SIZE` | Buffer size for data transfers | `5MiB` | Format: `5MiB`, `10MiB`, etc. |
+| `ACEXY_BUFFER_SIZE` | Buffer size for data transfers in MiB | `5` | Format: `5`, `10`, etc. |
 
-### Why Both Acexy and Acestream Engine?
+### Why Both PyAcexy and Acestream Engine?
 
-Acestream Scraper includes both Acexy and Acestream Engine for improved multi-client handling:
+Acestream Scraper includes both PyAcexy and Acestream Engine for improved multi-client handling:
 
 1. **Connection Management**: When multiple clients access the same stream, each needs a unique process ID (PID)
-2. **Automatic PID Handling**: Acexy automatically adds the required `pid=id` parameter to stream requests
+2. **Automatic PID Handling**: PyAcexy automatically adds the required `pid=id` parameter to stream requests
 3. **Error Isolation**: With proper PID management, one client disconnecting won't affect others
 4. **Simplified URLs**: End users don't need to worry about adding PID parameters manually
-5. **Performance**: Acexy includes buffering mechanisms to improve streaming performance
+5. **Performance**: PyAcexy includes buffering mechanisms to improve streaming performance
 
-Without Acexy, you'd need to manually append `&pid={unique_id}` to each stream URL to properly handle multiple connections. When a stream ends for one client, without this parameter, it might terminate the stream for all users. Acexy transparently manages these connections, making the system more robust for multi-user environments.
+Without PyAcexy, you'd need to manually append `&pid={unique_id}` to each stream URL to properly handle multiple connections. When a stream ends for one client, without this parameter, it might terminate the stream for all users. Acexy transparently manages these connections, making the system more robust for multi-user environments.
 
 ### ZeroNet and Other Settings
 
@@ -99,6 +101,8 @@ Without Acexy, you'd need to manually append `&pid={unique_id}` to each stream U
 |----------|-------------|---------|-------|
 | `ENABLE_TOR` | Enable TOR for ZeroNet connections | `false` | Set to `true` to use TOR with ZeroNet |
 | `TZ` | Timezone for the container | `Europe/Madrid` | Use any valid TZ identifier |
+| `REVERSE_PROXY_USER` | User created in Reverse Proxy Access List | `` | Use any alphanumeric character |
+| `REVERSE_PROXY_PASS` | Pass created in Reverse Proxy Access List | `` | Use any alphanumeric character |
 | `DOCKER_ENVIRONMENT` | Mark as running in Docker | `true` | Used for internal path configuration |
 
 ### WARP Configuration
@@ -115,13 +119,13 @@ Cloudflare WARP provides enhanced privacy and secure connection options:
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   --cap-add NET_ADMIN \
   --cap-add SYS_ADMIN \
   -e ENABLE_WARP=true \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### Docker Compose Example with WARP Enabled
@@ -131,7 +135,7 @@ version: '3.8'
 
 services:
   acestream-scraper:
-    image: pipepito/acestream-scraper:latest
+    image: visesa84/acestream-scraper-pyacexy:latest
     container_name: acestream-scraper
     cap_add:
       - NET_ADMIN
@@ -140,7 +144,7 @@ services:
       - TZ=Europe/Madrid
       - ENABLE_WARP=true
     ports:
-      - "8000:8000"
+      - "8040:8040"
     volumes:
       - ./data/config:/app/config
     restart: unless-stopped
@@ -166,7 +170,7 @@ When using Docker, map these ports as needed:
 
 | Port | Service | Notes |
 |------|---------|-------|
-| 8000 | Main web interface | Configurable via `FLASK_PORT` |
+| 8040 | Main web interface | Configurable via `FLASK_PORT` |
 | 8080 | Acexy web interface | Only if Acexy is enabled |
 | 6878 | Acestream HTTP API | Configurable via `ACESTREAM_HTTP_PORT` |
 | 43110 | ZeroNet web interface | Only if ZeroNet is enabled |
@@ -228,12 +232,39 @@ The application includes proper headers handling for running behind a reverse pr
 ### Nginx Example
 
 ```nginx
+upstream flask_app {
+    server IP:8040;
+}
+
+upstream acestream_engine {
+    server IP:8080;
+}
+
 server {
-    listen 80;
+    listen 443 ssl;
     server_name acestream.example.com;
 
+    # Certificates SSL
+    ssl_certificate /etc/letsencrypt/live/acestream.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/acestream.example.com/privkey.pem;
+
+    # ACCESS LIST (Generated with: htpasswd -c /etc/nginx/.htpasswd user)
+    auth_basic "Restricted Content";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
+    # 2. CUSTOM PATH: Redirect /ace to the AceStream engine (8080)
+    # We use ^~ to give it absolute priority over any other route.
+    location ^~ /ace {
+        proxy_pass http://acestream_engine;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 3. ROOT PATH: Redirect the rest to the Flask application
     location / {
-        proxy_pass http://localhost:8000;
+        proxy_pass http://flask_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -242,12 +273,66 @@ server {
 }
 ```
 
+### Traefik Example
+
+```traefik
+labels:
+      - "traefik.enable=true"
+      # 1. APP RULE (Port 8040)
+      - "traefik.http.routers.scraper-app.rule=Host(`acestream.example.com`)"
+      - "traefik.http.routers.scraper-app.entrypoints=websecure"
+      - "traefik.http.routers.scraper-app.tls=true"
+      - "traefik.http.routers.scraper-app.service=scraper-app-service"
+      - "traefik.http.services.scraper-app-service.loadbalancer.server.port=8040"
+
+      # 2. RULE FOR STREAMING (Port 8080)
+      # High priority to intercept /ace before the general rule
+      - "traefik.http.routers.scraper-ace.rule=Host(`acestream.example.com`) && PathPrefix(`/ace`)"
+      - "traefik.http.routers.scraper-ace.entrypoints=websecure"
+      - "traefik.http.routers.scraper-ace.tls=true"
+      - "traefik.http.routers.scraper-ace.priority=100"
+      - "traefik.http.routers.scraper-ace.service=scraper-ace-service"
+      - "traefik.http.services.scraper-ace-service.loadbalancer.server.port=8080"
+
+      # 3. ACCESS LIST (Basic Auth) - Applied to BOTH routers
+      # The value is: user:password_en_htpasswd (you can use online generators)
+      - "traefik.http.middlewares.scraper-auth.basicauth.users=usuario:$$apr1$$H64pzS7X$$h89SzhS..."
+      - "traefik.http.routers.scraper-app.middlewares=scraper-auth"
+      - "traefik.http.routers.scraper-ace.middlewares=scraper-auth"
+```
+
+### Apache VirtualHost Example
+
+```apache
+<VirtualHost *:443>
+    ServerName acestream.example.com
+	
+	# SSL Config
+    SSLEngine on
+    SSLCertificateFile /path/to/cert.pem
+    SSLCertificateKeyFile /path/to/key.pem
+	
+    # CUSTOM PATH: Redirect /ace to the AceStream engine (8080)
+    ProxyPass /ace http://IP:8080/ace
+    ProxyPassReverse /ace http://IP:8080/ace
+
+    # 3. ROOT PATH: Redirect the rest to the Flask application
+    ProxyPass / http://IP:8040/
+    ProxyPassReverse / http://IP:8040/
+    
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+</VirtualHost>
+```
+
 ## Security Considerations
 
 - Add your domain(s) to `ui_host` in ZeroNet config for public access
 - Always include `localhost` in `ui_host` for local access
 - Set `ALLOW_REMOTE_ACCESS=no` to restrict Acestream access to localhost only
 - Consider using a reverse proxy with SSL/TLS for secure access
+- Access list variables have been added for any reverse proxy
+	* Configure a Custom Location in the Proxy to route the /ace path to port 8080. The URL generator utilizes REVERSE_PROXY_USER and REVERSE_PROXY_PASS environment variables to automatically inject credentials and the domain into the streaming links
 - Be aware of copyright and legal considerations when sharing playlists
 
 ## Healthchecks

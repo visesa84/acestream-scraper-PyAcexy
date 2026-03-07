@@ -231,7 +231,7 @@ def start_background_check(channels, manager=None):
                     # RE-CONSULTA: Vital para evitar el error de SQLite de hilos
                     batch = db.session.query(AcestreamChannel).filter(AcestreamChannel.id.in_(batch_ids)).all()
                     if batch:
-                        logger.info(f"Procesando pareja: {i+1}-{min(i+batch_size, total)} de {total}")
+                        logger.info(f"Processing pair: {i+1}-{min(i+batch_size, total)} of {total}")
                         await service.check_channels(batch)
                         db.session.commit()
                         db.session.expunge_all() # Saca los objetos de la RAM

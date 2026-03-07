@@ -41,7 +41,7 @@ class M3UPlaylist(Resource):
                 api.abort(500, f"Error during playlist refresh: {str(e)}")
         
         playlist_service = PlaylistService()
-        playlist = playlist_service.generate_playlist(search_term=search)
+        playlist = playlist_service.generate_playlist(search_term=search, base_url=request.host_url)
         
         filename = f"acestream_playlist_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
         if search:
@@ -67,7 +67,8 @@ class TVChannelsPlaylist(Resource):
         playlist_service = PlaylistService()
         playlist = playlist_service.generate_tv_channels_playlist(
             search_term=search,
-            favorites_only=favorites_only
+            favorites_only=favorites_only,
+            base_url=request.host_url
         )
         
         filename = f"tv_channels_playlist_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
@@ -96,7 +97,8 @@ class EPGXmlGuide(Resource):
         playlist_service = PlaylistService()
         xml_guide = playlist_service.generate_epg_xml(
             search_term=search,
-            favorites_only=favorites_only
+            favorites_only=favorites_only,
+            base_url=request.host_url
         )
         
         filename = f"epg_guide_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
@@ -146,7 +148,8 @@ class AllStreamsPlaylist(Resource):
         playlist_service = PlaylistService()
         playlist = playlist_service.generate_all_streams_playlist(
             search_term=search,
-            include_unassigned=include_unassigned
+            include_unassigned=include_unassigned,
+            base_url=request.host_url
         )
         
         filename = f"all_streams_playlist_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
@@ -172,7 +175,10 @@ class OnlinePlaylist(Resource):
         favorites = args.get('favorites_only', False) # Captura el booleano
         
         playlist_service = PlaylistService()
-        playlist = playlist_service.generate_online_only_playlist(search_term=search)
+        playlist = playlist_service.generate_online_only_playlist(
+            search_term=search, 
+            base_url=request.host_url
+        )
         
         filename = f"online_streams_{datetime.now(timezone.utc).strftime('%H%M%S')}.m3u"
         
