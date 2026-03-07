@@ -40,15 +40,6 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/acestream-scraper-pyacexy:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/acestream-scraper-pyacexy:${{ github.ref_name }}
 
-      - name: Limpiar versiones antiguas de Docker Hub
-        uses: snok/container-retention-policy@v2
-        with:
-          account-type: dockerhub
-          image-names: acestream-scraper-pyacexy
-          cut-off: 1d
-          keep-at-least: 2
-          token: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Crear GitHub Release
         uses: ncipollo/release-action@v1
         with:
