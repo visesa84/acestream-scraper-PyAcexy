@@ -27,16 +27,28 @@ class PlaylistService:
         return user, password
 
     def _format_stream_url(self, channel_id: str, local_id: int, base_url: str = None) -> str:
-        # Normalizar base_url
+
+        def is_ip_address(h):
+            parts = h.split(".")
+            return len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
+
         if base_url:
             base_url = base_url.strip().rstrip("/")
+
+            # Si no tiene protocolo, decidir según si es IP o dominio
             if not base_url.startswith("http://") and not base_url.startswith("https://"):
-                base_url = "https://" + base_url
-                
+                if is_ip_address(base_url):
+                    base_url = "http://" + base_url
+                else:
+                    base_url = "https://" + base_url
+
+        # Si no hay base_url, usar config o localhost
         host = (base_url or getattr(self.config, 'base_url', 'http://localhost:8080')).rstrip('/')
         parsed = urlparse(host)
 
-        # Obtener usuario y contraseña desde Authorization
+        # -----------------------------
+        # 2. Obtener credenciales BasicAuth
+        # -----------------------------
         rp_user, rp_pass = self.get_basic_auth_credentials()
 
         auth_str = ""
@@ -45,17 +57,32 @@ class PlaylistService:
             safe_pass = quote(rp_pass, safe='')
             auth_str = f"{safe_user}:{safe_pass}@"
 
-        is_ip = any(char.isdigit() for char in (parsed.hostname or "").split('.'))
-        
-        if not is_ip and parsed.hostname:
-            host = f"https://{auth_str}{parsed.hostname}"
-        else:
-            flask_port = os.environ.get('FLASK_PORT', '8040')
-            if f":{flask_port}" in host:
-                host = host.replace(f":{flask_port}", ":8080")
-            if not host.startswith('http'):
-                host = f"http://{host}"
+        # -----------------------------
+        # 3. Detectar si es IP o dominio
+        # -----------------------------
+        hostname = parsed.hostname or ""
+        is_ip = is_ip_address(hostname)
 
+        # -----------------------------
+        # 4. Construir host final
+        # -----------------------------
+        if not is_ip and hostname:
+            # Dominio → siempre HTTPS
+            host = f"https://{auth_str}{hostname}"
+        else:
+            # IP local → siempre HTTP
+            host = f"http://{hostname}"
+
+            # Ajustar puerto: si viene de Flask (8040), cambiar a 8080
+            flask_port = os.environ.get('FLASK_PORT', '8040')
+            if parsed.port == int(flask_port):
+                host = f"http://{hostname}:8080"
+            elif parsed.port:
+                host = f"http://{hostname}:{parsed.port}"
+
+        # -----------------------------
+        # 5. Construir query final
+        # -----------------------------
         query = f"id={channel_id}"
         if getattr(self.config, 'addpid', False):
             query += f"&pid={local_id}"
