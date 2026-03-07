@@ -40,14 +40,13 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/acestream-scraper-pyacexy:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/acestream-scraper-pyacexy:${{ github.ref_name }}
 
-      - name: Limpiar versiones antiguas de Docker Hub
+            - name: Limpiar versiones antiguas de Docker Hub
         uses: snok/container-retention-policy@v2
         with:
-          image-names: acestream-scraper-pyacexy
-          cut-off: 1d # No borra lo que se acaba de subir
-          timezone: Europe/Madrid
-          keep-at-least: 2    # Mantiene la versión nueva y la anterior (más la latest)
           account-type: personal
+          image-names: acestream-scraper-pyacexy
+          cut-off: 2025-01-01T00:00:00Z 
+          keep-at-least: 2
           token: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Crear GitHub Release
