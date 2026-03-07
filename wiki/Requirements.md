@@ -61,7 +61,7 @@ The following ports need to be available on your system:
 
 | Port | Service | Required |
 |------|---------|----------|
-| 8000 | Web interface | Yes |
+| 8040 | Web interface | Yes |
 | 8080 | Acexy proxy | Only if enabled |
 | 6878 | Acestream Engine | Only if built-in engine is enabled |
 | 43110 | ZeroNet Web UI | Only if using ZeroNet |

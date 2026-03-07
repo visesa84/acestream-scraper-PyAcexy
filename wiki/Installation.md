@@ -42,8 +42,6 @@ Docker Compose provides the easiest way to get started with Acestream Scraper.
 		 - ACEXY_HOST=localhost
 		 - ACEXY_PORT=6878
 		 - ALLOW_REMOTE_ACCESS=no
-		 - REVERSE_PROXY_USER=
-		 - REVERSE_PROXY_PASS=
 		 - ACEXY_NO_RESPONSE_TIMEOUT=15
 		 - ACEXY_BUFFER_SIZE=5
 		 - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2

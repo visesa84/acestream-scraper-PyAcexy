@@ -114,6 +114,7 @@ exec gunicorn --bind "0.0.0.0:$FLASK_PORT" \
     --timeout 30 \
     --keep-alive 2 \
     --log-level info \
+	--forwarded-allow-ips="*" \
     "wsgi:flask_app"
 
 echo "Flask application logs available at $LOG_DIR/gunicorn-access.log and $LOG_DIR/gunicorn-error.log"

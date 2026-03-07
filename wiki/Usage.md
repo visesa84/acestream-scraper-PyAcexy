@@ -4,21 +4,21 @@ This guide explains how to use Acestream Scraper once it's installed.
 
 ## Contents
 - [Web Interface](#web-interface)
-  - [Dashboard](#dashboard)
-  - [Channel Management](#channel-management)
-  - [URL Management](#url-management)
-  - [Configuration Page](#configuration-page)
-  - [WARP Management](#warp-management)
+- [Dashboard](#dashboard)
+- [Channel Management](#channel-management)
+- [URL Management](#url-management)
+- [Configuration Page](#configuration-page)
+- [WARP Management](#warp-management)
 - [M3U Playlist](#m3u-playlist)
 - [API Documentation](#api-documentation)
-- [Acexy Interface](#acexy-interface)
+- [PyAcexy Interface](#pyacexy-interface)
 - [Cloudflare WARP](#cloudflare-warp)
 
 ## Web Interface
 
-Access the web interface by navigating to `http://localhost:8000` in your browser.
+Access the web interface by navigating to `http://localhost:8040` in your browser.
 
-![Dashboard Screenshot](https://github.com/user-attachments/assets/17e000b7-20de-4a80-a990-9d0d5b225754)
+![Dashboard Screenshot](https://github.com/visesa84/acestream-scraper-PyAcexy/blob/main/Dashboard.png)
 
 ### Dashboard
 
@@ -28,7 +28,7 @@ The dashboard provides an overview of your Acestream channels and system status.
 - Search for specific channels
 - Download the M3U playlist
 - Access configuration settings
-- View Acexy proxy status (if enabled)
+- View PyAcexy proxy status (if enabled)
 
 #### Dashboard Controls
 
@@ -38,9 +38,11 @@ The dashboard provides an overview of your Acestream channels and system status.
 - **Download Playlist**: Generate and download the M3U playlist
 - **Configuration**: Access the settings page
 
-### Channel Management
+### Config Management
 
-![Channels Screenshot](https://github.com/user-attachments/assets/17006755-43ff-4817-be2c-36397cf9631b)
+![Config Screenshot](https://github.com/visesa84/acestream-scraper-PyAcexy/blob/main/Config.png)
+
+### Channel Management
 
 Acestream Scraper allows you to manage channels in several ways:
 
@@ -113,7 +115,7 @@ The configuration page allows you to modify system settings:
 - **Base URL**: How to format channel URLs in the playlist
 - **Ace Engine URL**: Connection to your Acestream Engine
 - **Rescrape Interval**: How often to automatically check for new channels
-- **Acexy Status**: View the status of the Acexy proxy (if enabled)
+- **Acexy Status**: View the status of the PyAcexy proxy (if enabled)
 - **Acestream Engine Status**: View the status of the Acestream Engine
 - **WARP Status**: View and manage Cloudflare WARP connection (if enabled)
 
@@ -149,23 +151,23 @@ The M3U playlist can be used with media players like VLC, Kodi, or any other pla
 
 ### Accessing the Playlist
 
-Base URL: `http://localhost:8000/playlist.m3u`
+Base URL: `http://localhost:8040/playlist.m3u`
 
 #### Playlist Options
 
-- **Force refresh**: `http://localhost:8000/playlist.m3u?refresh=true`
-- **Search channels**: `http://localhost:8000/playlist.m3u?search=sports`
-- **Combined options**: `http://localhost:8000/playlist.m3u?refresh=true&search=sports`
+- **Force refresh**: `http://localhost:8040/playlist.m3u?refresh=true`
+- **Search channels**: `http://localhost:8040/playlist.m3u?search=sports`
+- **Combined options**: `http://localhost:8040/playlist.m3u?refresh=true&search=sports`
 
 ### Using in Media Players
 
-1. Copy the playlist URL (http://localhost:8000/playlist.m3u)
+1. Copy the playlist URL (http://localhost:8040/playlist.m3u)
 2. In your media player, select "Open Network Stream" or similar option
 3. Paste the URL and play
 
 ### URL Formatting Note
 
-- When using Acexy proxy (port 8080), stream URLs are formatted as `{base_url}{channel_id}`
+- When using PyAcexy proxy (port 8080), stream URLs are formatted as `{base_url}{channel_id}`
 - For all other configurations, `&pid={local_id}` is automatically appended to each stream URL: `{base_url}{channel_id}&pid={local_id}`
 - This ensures proper channel identification in various player environments
 
@@ -173,7 +175,7 @@ Base URL: `http://localhost:8000/playlist.m3u`
 
 Acestream Scraper provides an OpenAPI/Swagger interface for developers:
 
-1. Access the API docs at: `http://localhost:8000/api/docs`
+1. Access the API docs at: `http://localhost:8040/api/docs`
 2. Browse available endpoints and their parameters
 3. Test API calls directly from the browser interface
 
@@ -187,12 +189,12 @@ Acestream Scraper provides an OpenAPI/Swagger interface for developers:
 - `/api/health` - Check system health
 - `/api/warp` - Manage Cloudflare WARP connection
 
-## Acexy Interface
+## PyAcexy Interface
 
-If you enabled Acexy (recommended):
+If you enabled PyAcexy (recommended):
 
-1. Access the Acexy status endpoint at: `http://localhost:8080/ace/status`
-2. Check Acexy status directly in the main dashboard
+1. Access the PyAcexy status endpoint at: `http://localhost:8080/ace/status`
+2. Check PyAcexy status directly in the main dashboard
 3. Manage your Acestream connections through this web interface
 
 ## Cloudflare WARP

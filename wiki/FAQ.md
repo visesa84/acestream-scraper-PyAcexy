@@ -216,8 +216,8 @@ Solutions to try:
 Yes, but you need to change the port mappings to avoid conflicts. For example:
 ```yaml
 ports:
-  - "8041:8000"  # First instance
-  - "8042:8000"  # Second instance
+  - "8041:8040"  # First instance
+  - "8042:8040"  # Second instance
 ```
 
 ### How can I contribute to the project?
