@@ -9,7 +9,7 @@ from whitenoise import WhiteNoise
 try:
     subprocess.run([sys.executable, "manage.py", "upgrade"], check=True)
 except Exception as e:
-    print(f"Error en migraciones: {e}")
+    print(f"Migration error: {e}")
 
 # 2. Crear App Flask
 flask_app = create_app()

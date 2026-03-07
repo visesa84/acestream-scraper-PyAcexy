@@ -40,20 +40,30 @@ A Python-based web scraping application that retrieves Acestream channel informa
        image: visesa84/acestream-scraper-pyacexy:latest
        container_name: acestream-scraper
        environment:
-         - TZ=Europe/Madrid
-         - ENABLE_TOR=false
-         - ENABLE_=true
-         - ENABLE_ACESTREAM_ENGINE=true
-         - ACESTREAM_HTTP_PORT=6878
-         - FLASK_PORT=8000
-         - LISTEN_ADDR=:8080
-         - HOST=localhost
-         - PORT=6878
-         - ALLOW_REMOTE_ACCESS=no
-         - BUFFER_SIZE=10
-         - ACESTREAM_HTTP_HOST=localhost
+		 - TZ=Europe/Madrid
+		 - ENABLE_TOR=false
+		 - ENABLE_ACEXY=true
+		 - ENABLE_ACESTREAM_ENGINE=true
+		 - ENABLE_WARP=false
+		 - WARP_ENABLE_NAT=true
+		 - WARP_ENABLE_IPV6=false
+		 - IPV6_DISABLED=true
+		 - ACESTREAM_HTTP_PORT=6878
+		 - ACESTREAM_HTTP_HOST=ACEXY_HOST
+		 - FLASK_PORT=8040
+		 - ACEXY_LISTEN_ADDR=:8080
+		 - ACEXY_HOST=localhost
+		 - ACEXY_PORT=6878
+		 - ALLOW_REMOTE_ACCESS=no
+		 - REVERSE_PROXY_USER=
+		 - REVERSE_PROXY_PASS=
+		 - ACEXY_NO_RESPONSE_TIMEOUT=15
+		 - ACEXY_BUFFER_SIZE=5
+		 - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+		 - MALLOC_CONF=dirty_decay_ms:1000,muzzy_decay_ms:1000
+		 - EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory"
        ports:
-         - "8000:8000"  # Flask application
+         - "8040:8040"  # Flask application
          - "8080:8080"  #  proxy
          - "8621:8621"  # Acestream P2P Port
          - "43110:43110"  # ZeroNet UI
@@ -88,7 +98,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
    ```bash
    docker pull visesa84/acestream-scraper-pyacexy:latest
    docker run -d \
-     -p 8000:8000 \
+     -p 8040:8040 \
      -v "${PWD}/config:/app/config" \
      --name acestream-scraper \
      visesa84/acestream-scraper-pyacexy:latest
@@ -96,7 +106,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 
 2. **Access the setup wizard:**
    
-   Open your browser and navigate to `http://localhost:8000`
+   Open your browser and navigate to `http://localhost:8040`
    
    The first-time setup wizard will guide you through configuration:
    - Base URL format (acestream:// or http://)
@@ -115,7 +125,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
            "https://example.com/url1",
            "https://example.com/url2"
        ],
-       "base_url": "http://127.0.0.1:8008/ace/getstream?id=",
+       "base_url": "http://127.0.0.1:8080/ace/getstream?id=",
        "ace_engine_url": "http://127.0.0.1:6878"
    }
    ```
@@ -126,7 +136,7 @@ The image includes an embedded Acestream engine with the PyAcexy proxy interface
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -p 8080:8080 \
   -e ENABLE_ACEXY=true \
   -e ENABLE_ACESTREAM_ENGINE=true \
@@ -144,7 +154,7 @@ You can connect the PyAcexy proxy to an external Acestream Engine instance:
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -p 8080:8080 \
   -e ENABLE_ACEXY=true \
   -e ENABLE_ACESTREAM_ENGINE=false \
@@ -163,7 +173,7 @@ The application can scrape ZeroNet sites for channel information:
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -p 43110:43110 \
   -p 43111:43111 \
   -v "${PWD}/config:/app/config" \
@@ -176,7 +186,7 @@ docker run -d \
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -p 43110:43110 \
   -p 43111:43111 \
   -e ENABLE_TOR=true \
@@ -192,7 +202,7 @@ The application can use Cloudflare WARP to provide enhanced privacy and access t
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   --cap-add NET_ADMIN \
   --cap-add SYS_ADMIN \
   -e ENABLE_WARP=true \
@@ -231,7 +241,7 @@ docker run -d \
 
 ### Web Interface
 
-Access the web interface at `http://localhost:8000`
+Access the web interface at `http://localhost:8040`
 
 ![image](https://github.com/visesa84/acestream-scraper-PyAcexy/blob/main/Dashboard.png)
 ![image](https://github.com/visesa84/acestream-scraper-PyAcexy/blob/main/Config.png)
@@ -264,12 +274,12 @@ The main dashboard provides:
 
 Get the M3U playlist for your media player:
 
-- Current playlist: `http://localhost:8000/playlist.m3u`
-- Force refresh: `http://localhost:8000/playlist.m3u?refresh=true`
-- Search channels: `http://localhost:8000/playlist.m3u?search=sports`
+- Current playlist: `http://localhost:8040/playlist.m3u`
+- Force refresh: `http://localhost:8040/playlist.m3u?refresh=true`
+- Search channels: `http://localhost:8040/playlist.m3u?search=sports`
 
 To use in your media player (like VLC):
-1. Copy the playlist URL (http://localhost:8000/playlist.m3u)
+1. Copy the playlist URL (http://localhost:8040/playlist.m3u)
 2. In your media player, select "Open Network Stream" or similar option
 3. Paste the URL and play
 
@@ -282,7 +292,7 @@ To use in your media player (like VLC):
 
 The application provides OpenAPI/Swagger documentation:
 
-- Access at: `http://localhost:8000/api/docs`
+- Access at: `http://localhost:8040/api/docs`
 - Interactive API documentation for developers
 - Test endpoints directly from the browser
 
@@ -310,7 +320,7 @@ Configure through the setup wizard or directly in `config.json`:
 
 #### Core Application
 
-- `FLASK_PORT`: Port the Flask application runs on (default: `8000`)
+- `FLASK_PORT`: Port the Flask application runs on (default: `8040`)
 
 #### Acestream Configuration
 
@@ -342,6 +352,8 @@ Cloudflare WARP provides enhanced privacy and secure tunneling:
 
 - `ENABLE_TOR`: Enable TOR for ZeroNet connections (default: `false`)
 - `TZ`: Timezone for the container (default: `Europe/Madrid`)
+- `REVERSE_PROXY_USER`: User created in Reverse Proxy Access List (default: ``)
+- `REVERSE_PROXY_PASS`: Pass created in Reverse Proxy Access List (default: ``)
 
 ### Channel Status Checking
 
@@ -359,7 +371,7 @@ To use this feature:
 
 ### Port Mapping
 
-- `8000`: Main web interface (configurable via `FLASK_PORT`)
+- `8040`: Main web interface (configurable via `FLASK_PORT`)
 - `43110`: ZeroNet web interface (if ZeroNet enabled)
 - `43111`: ZeroNet transport port (if ZeroNet enabled)
 - `8080`: PyAcexy web interface (if enabled)
@@ -404,7 +416,7 @@ ui_port = 43110
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -p 43110:43110 \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
@@ -424,6 +436,8 @@ The application includes proper headers handling for running behind a reverse pr
 - Add your domain(s) to `ui_host` for public access
 - Always include `localhost` for local access
 - Set `ALLOW_REMOTE_ACCESS=no` to restrict Acestream access to localhost only
+- Access list variables have been added for any reverse proxy
+	* Configure a Custom Location in the Proxy to route the /ace path to port 8080. The URL generator utilizes REVERSE_PROXY_USER and REVERSE_PROXY_PASS environment variables to automatically inject credentials and the domain into the streaming links
 
 ### Healthchecks
 

@@ -24,24 +24,33 @@ Docker Compose provides the easiest way to get started with Acestream Scraper.
 
    services:
      acestream-scraper:
-       image: pipepito/acestream-scraper:latest
+       image: visesa84/acestream-scraper-pyacexy
        container_name: acestream-scraper
        environment:
          - TZ=Europe/Madrid
-         - ENABLE_TOR=false
-         - ENABLE_ACEXY=true
-         - ENABLE_ACESTREAM_ENGINE=true
-         - ACESTREAM_HTTP_PORT=6878
-         - FLASK_PORT=8000
-         - ACEXY_LISTEN_ADDR=:8080
-         - ACEXY_HOST=localhost
-         - ACEXY_PORT=6878
-         - ALLOW_REMOTE_ACCESS=no
-         - ACEXY_NO_RESPONSE_TIMEOUT=15s
-         - ACEXY_BUFFER_SIZE=5MiB
-         - ACESTREAM_HTTP_HOST=localhost
+		 - ENABLE_TOR=false
+		 - ENABLE_ACEXY=true
+		 - ENABLE_ACESTREAM_ENGINE=true
+		 - ENABLE_WARP=false
+		 - WARP_ENABLE_NAT=true
+		 - WARP_ENABLE_IPV6=false
+		 - IPV6_DISABLED=true
+		 - ACESTREAM_HTTP_PORT=6878
+		 - ACESTREAM_HTTP_HOST=ACEXY_HOST
+		 - FLASK_PORT=8040
+		 - ACEXY_LISTEN_ADDR=:8080
+		 - ACEXY_HOST=localhost
+		 - ACEXY_PORT=6878
+		 - ALLOW_REMOTE_ACCESS=no
+		 - REVERSE_PROXY_USER=
+		 - REVERSE_PROXY_PASS=
+		 - ACEXY_NO_RESPONSE_TIMEOUT=15
+		 - ACEXY_BUFFER_SIZE=5
+		 - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+		 - MALLOC_CONF=dirty_decay_ms:1000,muzzy_decay_ms:1000
+		 - EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory"
        ports:
-         - "8000:8000"  # Flask application
+         - "8040:8040"  # Flask application
          - "8080:8080"  # Acexy proxy
          - "8621:8621"  # Acestream P2P Port
          - "43110:43110"  # ZeroNet UI
@@ -67,7 +76,7 @@ Docker Compose provides the easiest way to get started with Acestream Scraper.
 
 3. **Access the application:**
    
-   Open your browser and navigate to `http://localhost:8000`
+   Open your browser and navigate to `http://localhost:8040`
    
    The first-time setup wizard will guide you through configuration
 
@@ -80,31 +89,31 @@ If you prefer using Docker without Docker Compose, follow these steps:
 ```bash
 docker pull pipepito/acestream-scraper:latest
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### With Acexy and Internal Acestream Engine
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -p 8080:8080 \
   -e ENABLE_ACEXY=true \
   -e ENABLE_ACESTREAM_ENGINE=true \
   -e ALLOW_REMOTE_ACCESS=yes \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### With External Acestream Engine
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -p 8080:8080 \
   -e ENABLE_ACEXY=true \
   -e ENABLE_ACESTREAM_ENGINE=false \
@@ -112,34 +121,34 @@ docker run -d \
   -e ACEXY_PORT=6878 \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### With ZeroNet (TOR disabled)
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -p 43110:43110 \
   -p 43111:43111 \
   -v "${PWD}/config:/app/config" \
   -v "${PWD}/zeronet_data:/app/ZeroNet/data" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ### With ZeroNet (TOR enabled)
 
 ```bash
 docker run -d \
-  -p 8000:8000 \
+  -p 8040:8040 \
   -p 43110:43110 \
   -p 43111:43111 \
   -e ENABLE_TOR=true \
   -v "${PWD}/config:/app/config" \
   -v "${PWD}/zeronet_data:/app/ZeroNet/data" \
   --name acestream-scraper \
-  pipepito/acestream-scraper:latest
+  visesa84/acestream-scraper-pyacexy:latest
 ```
 
 ## Manual Installation
@@ -155,7 +164,7 @@ For advanced users who want to run the application directly on their system:
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/Pipepito/acestream-scraper.git
+   git clone https://github.com/visesa84/acestream-scraper-PyAcexy.git
    cd acestream-scraper
    ```
 
@@ -200,4 +209,4 @@ For advanced users who want to run the application directly on their system:
 
 5. **Access the application:**
    
-   Open your browser and navigate to `http://localhost:8000`
+   Open your browser and navigate to `http://localhost:8040`
