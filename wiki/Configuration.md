@@ -101,8 +101,6 @@ Without PyAcexy, you'd need to manually append `&pid={unique_id}` to each stream
 |----------|-------------|---------|-------|
 | `ENABLE_TOR` | Enable TOR for ZeroNet connections | `false` | Set to `true` to use TOR with ZeroNet |
 | `TZ` | Timezone for the container | `Europe/Madrid` | Use any valid TZ identifier |
-| `REVERSE_PROXY_USER` | User created in Reverse Proxy Access List | `` | Use any alphanumeric character |
-| `REVERSE_PROXY_PASS` | Pass created in Reverse Proxy Access List | `` | Use any alphanumeric character |
 | `DOCKER_ENVIRONMENT` | Mark as running in Docker | `true` | Used for internal path configuration |
 
 ### WARP Configuration
@@ -232,6 +230,14 @@ The application includes proper headers handling for running behind a reverse pr
 ### Nginx Example
 
 ```nginx
+server {
+    listen 80;
+    server_name acestream.example.com;
+
+    # Permanent redirect to HTTPS
+    return 301 https://$host$request_uri;
+}
+
 upstream flask_app {
     server IP:8040;
 }
@@ -241,34 +247,49 @@ upstream acestream_engine {
 }
 
 server {
-    listen 443 ssl;
+    listen 443 ssl http2;
     server_name acestream.example.com;
 
     # Certificates SSL
     ssl_certificate /etc/letsencrypt/live/acestream.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/acestream.example.com/privkey.pem;
 
-    # ACCESS LIST (Generated with: htpasswd -c /etc/nginx/.htpasswd user)
+    # ----------------------------------------------------
+	# 1. Basic Authentication
+    # ----------------------------------------------------
     auth_basic "Restricted Content";
     auth_basic_user_file /etc/nginx/.htpasswd;
 
-    # 2. CUSTOM PATH: Redirect /ace to the AceStream engine (8080)
-    # We use ^~ to give it absolute priority over any other route.
+    # ----------------------------------------------------
+    #2. Forward Authorization to the backend
+    # ----------------------------------------------------
+    proxy_set_header Authorization $http_authorization;
+
+    # ----------------------------------------------------
+    # 3. PyAcexy App (8080)
+    # ----------------------------------------------------
     location ^~ /ace {
-        proxy_pass http://acestream_engine;
+        proxy_pass http://IP:8080;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
     }
 
-    # 3. ROOT PATH: Redirect the rest to the Flask application
+    # ----------------------------------------------------
+    # 4. Flask App (8040)
+    # ----------------------------------------------------
     location / {
-        proxy_pass http://flask_app;
+        proxy_pass http://IP:8040;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Authorization $http_authorization;
     }
 }
 ```
@@ -277,51 +298,114 @@ server {
 
 ```traefik
 labels:
-      - "traefik.enable=true"
-      # 1. APP RULE (Port 8040)
-      - "traefik.http.routers.scraper-app.rule=Host(`acestream.example.com`)"
-      - "traefik.http.routers.scraper-app.entrypoints=websecure"
-      - "traefik.http.routers.scraper-app.tls=true"
-      - "traefik.http.routers.scraper-app.service=scraper-app-service"
-      - "traefik.http.services.scraper-app-service.loadbalancer.server.port=8040"
+  - "traefik.enable=true"
 
-      # 2. RULE FOR STREAMING (Port 8080)
-      # High priority to intercept /ace before the general rule
-      - "traefik.http.routers.scraper-ace.rule=Host(`acestream.example.com`) && PathPrefix(`/ace`)"
-      - "traefik.http.routers.scraper-ace.entrypoints=websecure"
-      - "traefik.http.routers.scraper-ace.tls=true"
-      - "traefik.http.routers.scraper-ace.priority=100"
-      - "traefik.http.routers.scraper-ace.service=scraper-ace-service"
-      - "traefik.http.services.scraper-ace-service.loadbalancer.server.port=8080"
+  # ----------------------------------------------------
+  # 1. HTTP → HTTPS REDIRECT
+  # ----------------------------------------------------
+  - "traefik.http.routers.scraper-redirect.entrypoints=web"
+  - "traefik.http.routers.scraper-redirect.rule=Host(`acestream.example.com`)"
+  - "traefik.http.routers.scraper-redirect.middlewares=scraper-https"
+  - "traefik.http.middlewares.scraper-https.redirectscheme.scheme=https"
 
-      # 3. ACCESS LIST (Basic Auth) - Applied to BOTH routers
-      # The value is: user:password_en_htpasswd (you can use online generators)
-      - "traefik.http.middlewares.scraper-auth.basicauth.users=usuario:$$apr1$$H64pzS7X$$h89SzhS..."
-      - "traefik.http.routers.scraper-app.middlewares=scraper-auth"
-      - "traefik.http.routers.scraper-ace.middlewares=scraper-auth"
+  # ----------------------------------------------------
+  #2. MAIN ROUTER (Flask - port 8040)
+  # ----------------------------------------------------
+  - "traefik.http.routers.scraper-app.rule=Host(`acestream.example.com`)"
+  - "traefik.http.routers.scraper-app.entrypoints=websecure"
+  - "traefik.http.routers.scraper-app.tls=true"
+  - "traefik.http.routers.scraper-app.service=scraper-app-service"
+  - "traefik.http.services.scraper-app-service.loadbalancer.server.port=8040"
+
+  # ----------------------------------------------------
+  # 3. PYACEXY ROUTER (port 8080)
+  # HIGH PRIORITY to intercept /ace
+  # ----------------------------------------------------
+  - "traefik.http.routers.scraper-ace.rule=Host(`acestream.example.com`) && PathPrefix(`/ace`)"
+  - "traefik.http.routers.scraper-ace.entrypoints=websecure"
+  - "traefik.http.routers.scraper-ace.tls=true"
+  - "traefik.http.routers.scraper-ace.priority=100"
+  - "traefik.http.routers.scraper-ace.service=scraper-ace-service"
+  - "traefik.http.services.scraper-ace-service.loadbalancer.server.port=8080"
+
+  # ----------------------------------------------------
+  # 4. BASIC AUTH
+  # ----------------------------------------------------
+  - "traefik.http.middlewares.scraper-auth.basicauth.users=usuario:$$apr1$$H64pzS7X$$h89SzhS..."
+
+  # Apply BasicAuth to both routers
+  - "traefik.http.routers.scraper-app.middlewares=scraper-auth"
+  - "traefik.http.routers.scraper-ace.middlewares=scraper-auth"
+
+  # ----------------------------------------------------
+  # 5. CORRECT HEADERS FOR FLASK
+  # ----------------------------------------------------
+  - "traefik.http.middlewares.scraper-headers.headers.customrequestheaders.X-Forwarded-Host=acestream.example.com"
+  - "traefik.http.routers.scraper-app.middlewares=scraper-auth,scraper-headers"
+  - "traefik.http.routers.scraper-ace.middlewares=scraper-auth,scraper-headers"
 ```
 
 ### Apache VirtualHost Example
 
 ```apache
+  # ----------------------------------------------------
+  #Activate these modules
+  # ----------------------------------------------------
+	a2enmod ssl
+	a2enmod proxy
+	a2enmod proxy_http
+	a2enmod headers
+	a2enmod rewrite
+	a2enmod auth_basic
+
+<VirtualHost *:80>
+    ServerName acestream.example.com
+    RewriteEngine On
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}$1 [R=301,L]
+</VirtualHost>
+
 <VirtualHost *:443>
     ServerName acestream.example.com
-	
-	# SSL Config
+
+    # SSL
     SSLEngine on
-    SSLCertificateFile /path/to/cert.pem
-    SSLCertificateKeyFile /path/to/key.pem
-	
-    # CUSTOM PATH: Redirect /ace to the AceStream engine (8080)
-    ProxyPass /ace http://IP:8080/ace
+    SSLCertificateFile /etc/letsencrypt/live/acestream.example.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/acestream.example.com/privkey.pem
+
+    # ----------------------------------------------------
+    # 1. BASIC AUTH
+    # ----------------------------------------------------
+    <Location />
+        AuthType Basic
+        AuthName "Restricted Content"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+    </Location>
+
+    # ----------------------------------------------------
+    # 2. Resend Authorization to backend
+    # ----------------------------------------------------
+    RequestHeader set Authorization "%{Authorization}e" env=REDIRECT_AUTHORIZATION
+
+    # ----------------------------------------------------
+    # 3. PyAcexy App (8080)
+    # ----------------------------------------------------
+    ProxyPass        /ace http://IP:8080/ace
     ProxyPassReverse /ace http://IP:8080/ace
 
-    # 3. ROOT PATH: Redirect the rest to the Flask application
-    ProxyPass / http://IP:8040/
+    # ----------------------------------------------------
+    # 4. Flask App (8040)
+    # ----------------------------------------------------
+    ProxyPass        / http://IP:8040/
     ProxyPassReverse / http://IP:8040/
-    
+
+    # ----------------------------------------------------
+    # 5. Cabeceras Forwarded
+    # ----------------------------------------------------
     ProxyPreserveHost On
     RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Forwarded-Host "%{HTTP_HOST}s"
+
 </VirtualHost>
 ```
 
@@ -331,8 +415,7 @@ labels:
 - Always include `localhost` in `ui_host` for local access
 - Set `ALLOW_REMOTE_ACCESS=no` to restrict Acestream access to localhost only
 - Consider using a reverse proxy with SSL/TLS for secure access
-- Access list variables have been added for any reverse proxy
-	* Configure a Custom Location in the Proxy to route the /ace path to port 8080. The URL generator utilizes REVERSE_PROXY_USER and REVERSE_PROXY_PASS environment variables to automatically inject credentials and the domain into the streaming links
+- Configure a Custom Location in the Proxy to route the /ace path to port 8080. The URL generator utilizes Access List from Reverse Proxy to inject credentials and the domain into the streaming links
 - Be aware of copyright and legal considerations when sharing playlists
 
 ## Healthchecks

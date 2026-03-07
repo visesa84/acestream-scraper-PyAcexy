@@ -1,4 +1,6 @@
 import os
+import base64
+from flask import request
 from urllib.parse import urlparse, quote
 from typing import List, Dict, Optional
 from ..repositories import ChannelRepository
@@ -13,42 +15,51 @@ class PlaylistService:
         self.config = Config()
         self.tv_channel_repository = TVChannelRepository()
         self.tv_channel_service = TVChannelService()
+    
+    def get_basic_auth_credentials(self):
+        auth = request.headers.get("Authorization")
+        if not auth or not auth.startswith("Basic "):
+            return None, None
+
+        encoded = auth.split(" ", 1)[1]
+        decoded = base64.b64decode(encoded).decode("utf-8")
+        user, password = decoded.split(":", 1)
+        return user, password
 
     def _format_stream_url(self, channel_id: str, local_id: int, base_url: str = None) -> str:
-        # 1. Obtener host y limpiar
+        # Normalizar base_url
+        if base_url:
+            base_url = base_url.strip().rstrip("/")
+            if not base_url.startswith("http://") and not base_url.startswith("https://"):
+                base_url = "https://" + base_url
+                
         host = (base_url or getattr(self.config, 'base_url', 'http://localhost:8080')).rstrip('/')
         parsed = urlparse(host)
-        
-        # 2. Definir credenciales de Access List
-        rp_user = os.environ.get('REVERSE_PROXY_USER')
-        rp_pass = os.environ.get('REVERSE_PROXY_PASS')
-        
-        # 2. Escapar caracteres especiales
+
+        # Obtener usuario y contraseña desde Authorization
+        rp_user, rp_pass = self.get_basic_auth_credentials()
+
         auth_str = ""
         if rp_user and rp_pass:
             safe_user = quote(rp_user, safe='')
             safe_pass = quote(rp_pass, safe='')
             auth_str = f"{safe_user}:{safe_pass}@"
 
-        # 3. Detectar si es Dominio o IP Local
         is_ip = any(char.isdigit() for char in (parsed.hostname or "").split('.'))
-
+        
         if not is_ip and parsed.hostname:
-            # CASO DOMINIO: Forzamos HTTPS e inyectamos el auth_str
             host = f"https://{auth_str}{parsed.hostname}"
         else:
-            # CASO IP LOCAL
             flask_port = os.environ.get('FLASK_PORT', '8040')
             if f":{flask_port}" in host:
                 host = host.replace(f":{flask_port}", ":8080")
             if not host.startswith('http'):
                 host = f"http://{host}"
 
-        # 4. Construcción final
         query = f"id={channel_id}"
         if getattr(self.config, 'addpid', False):
             query += f"&pid={local_id}"
-            
+
         return f"{host}/ace/getstream?{query}"
 
     def _get_channels(self, search_term: str = None):

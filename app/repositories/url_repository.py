@@ -128,7 +128,7 @@ class URLRepository(BaseRepository[ScrapedURL]):
         """Get or create a special URL for manually added channels.
         
         Args:
-            base_url: The base URL of the application (e.g., http://localhost:8000)
+            base_url: The base URL of the application (e.g., http://localhost:8040)
             
         Returns:
             A ScrapedURL object for manually added channels
