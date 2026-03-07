@@ -43,9 +43,9 @@ jobs:
       - name: Limpiar versiones antiguas de Docker Hub
         uses: snok/container-retention-policy@v2
         with:
-          account-type: personal
+          account-type: dockerhub
           image-names: acestream-scraper-pyacexy
-          cut-off: 2025-01-01T00:00:00Z 
+          cut-off: 1d
           keep-at-least: 2
           token: ${{ secrets.DOCKERHUB_TOKEN }}
 
