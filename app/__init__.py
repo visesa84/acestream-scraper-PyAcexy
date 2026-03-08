@@ -2,6 +2,7 @@ import os
 import asyncio
 import threading
 import logging
+import fasteners  # IMPORTANTE: Añadir a requirements.txt
 from flask import Flask, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 from app.extensions import db, migrate
@@ -12,7 +13,7 @@ task_manager = None
 def create_app(test_config=None):
     """Create and configure the Flask app."""
     
-    # Importaciones locales para evitar IMPORTACIÓN CIRCULAR al arrancar
+    # Importaciones locales para evitar IMPORTACIÓN CIRCULAR
     from app.utils.config import Config
     from app.tasks.manager import TaskManager
     from app.repositories import SettingsRepository
@@ -39,7 +40,7 @@ def create_app(test_config=None):
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
     app.config['DEBUG'] = os.environ.get('FLASK_ENV') == 'development'
 
-    # 1. Cargar Configuración Inicial (Sin tocar Base de Datos aún)
+    # 1. Cargar Configuración Inicial
     try:
         config = Config()
         if config.database_path:
@@ -59,7 +60,7 @@ def create_app(test_config=None):
         logger.error(f"Error initializing Config: {e}")
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
 
-    # 2. Inicializar Extensiones (Crucial antes de cualquier otra cosa)
+    # 2. Inicializar Extensiones
     db.init_app(app)
     migrate.init_app(app, db)
 
@@ -71,7 +72,7 @@ def create_app(test_config=None):
         from app.views.main import bp as main_blueprint
         app.register_blueprint(main_blueprint)
         
-        # Inyectar task_manager en el blueprint para compatibilidad
+        # Inyectar task_manager en el blueprint
         main_blueprint.task_manager = task_manager
     except Exception as e:
         logger.warning(f"Error registering blueprints: {e}")
@@ -86,30 +87,47 @@ def create_app(test_config=None):
             logger.info("Initializing database tables...")
             db.create_all()
             
-            # Vincular el repositorio a la configuración
             settings_repo = SettingsRepository()
             config.set_settings_repository(settings_repo)
-            logger.info("Settings repository linked to Config")
 
-            # Arrancar Task Manager en segundo plano (Solo si no es test)
+            # Arrancar Task Manager con BLOQUEO DE PROCESO
             if not is_testing:
                 task_manager.init_app(app)
 
                 def run_background_loop():
-                    # Crear un nuevo loop de asyncio para este hilo específico
+                    # Definimos el archivo de bloqueo (compartido entre los 4 workers de Gunicorn)
+                    lock = fasteners.InterProcessLock('/tmp/task_manager.lock')
+                    
+                    # Intentamos obtener el lock (sin bloquear al worker de Gunicorn)
+                    got_lock = lock.acquire(blocking=False)
+                    
+                    if not got_lock:
+                        logger.info("[Worker] TaskManager is already active in another process. Skipping.")
+                        return
+
+                    logger.info("[MANAGER] Lock acquired! This worker will execute the stream loop.")
+                    
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     try:
+                        # Ejecutamos tu bucle infinito
                         loop.run_until_complete(task_manager.start())
                     except Exception as e:
                         logger.error(f"Task Manager loop crashed: {e}")
                     finally:
+                        # Si el bucle termina o falla, liberamos para que otro worker tome el relevo
+                        if lock.exists():
+                            lock.release()
                         loop.close()
                 
-                # Daemon=True permite que el proceso principal se cierre correctamente
-                thread = threading.Thread(target=run_background_loop, name="TaskManagerThread", daemon=True)
+                # Lanzamos el hilo. Solo el primer worker que gane el lock continuará.
+                thread = threading.Thread(
+                    target=run_background_loop, 
+                    name="TaskManagerThread", 
+                    daemon=True
+                )
                 thread.start()
-                logger.info("TaskManager background thread started successfully")
+                logger.info("TaskManager thread initialized (Lock pending check)")
 
         except Exception as e:
             logger.error(f"Fatal error during app startup: {e}", exc_info=True)

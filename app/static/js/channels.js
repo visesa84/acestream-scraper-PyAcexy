@@ -139,6 +139,22 @@ async function checkChannelsStatus() {
     }
 }
 
+// Enable or disable the channel
+function toggleChannelStatus(channelId, currentStatus) {
+    const newStatus = (currentStatus === 'active') ? 'disabled' : 'active';
+    
+    fetch(`/api/channels/${channelId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+    })
+    .then(response => {
+        if (response.ok) refreshChannelList(); // Recarga la lista
+        else alert('Error updating status');
+    })
+    .catch(err => console.error('Error:', err));
+}
+
 // Refresh channels list with optional search term and URL filter
 async function refreshChannelList(searchTerm = '', urlId = '') {
     try {
@@ -279,8 +295,15 @@ async function editChannel(channelId) {
         }
         
         const channel = await response.json();
+		const statusField = document.getElementById('editChannelStatus');
+		const statusLabel = document.getElementById('statusLabelText');
+		if (statusField && statusLabel) {
+			const isActive = (channel.status === 'active');
+			statusField.checked = isActive;
+			statusLabel.textContent = isActive ? 'Active' : 'Disabled';
+			statusLabel.className = isActive ? 'fw-bold text-success' : 'fw-bold text-danger';
+		}
         
-        // Populate form fields
         document.getElementById('editChannelId').value = channel.id;
         document.getElementById('editChannelName').value = channel.name || '';
         document.getElementById('editChannelGroup').value = channel.group || '';
@@ -313,6 +336,16 @@ document.addEventListener('DOMContentLoaded', function() {
     if (saveButton) {
         saveButton.addEventListener('click', saveChannelChanges);
     }
+	document.getElementById('editChannelStatus').addEventListener('change', function() {
+		const statusLabel = document.getElementById('statusLabelText');
+		if (this.checked) {
+			statusLabel.textContent = 'Active';
+			statusLabel.className = 'fw-bold text-success';
+		} else {
+			statusLabel.textContent = 'Disabled';
+			statusLabel.className = 'fw-bold text-danger';
+		}
+	});
 });
 
 // Save changes to an edited channel
@@ -329,12 +362,14 @@ async function saveChannelChanges() {
         const channelOriginalUrl = document.getElementById('editChannelOriginalUrl').value;
         const channelM3uSource = document.getElementById('editChannelM3uSource').value;
         const epgLocked = document.getElementById('editChannelEpgLocked').checked;
+		const isEnabled = document.getElementById('editChannelStatus').checked;
         
         // Create channel data object
         const channelData = {
             name: channelName,
             group: channelGroup,
-            epg_update_protected: epgLocked  
+            epg_update_protected: epgLocked,
+			status: isEnabled ? 'active' : 'disabled'
         };
         
         // Only include fields that have values

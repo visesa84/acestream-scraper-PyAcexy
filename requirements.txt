@@ -10,3 +10,4 @@ werkzeug==2.0.3
 requests>=2.31.0
 python-dateutil>=2.8.2
 whitenoise==6.9.0
+fasteners==0.19

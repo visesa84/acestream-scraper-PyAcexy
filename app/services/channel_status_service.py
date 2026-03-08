@@ -226,6 +226,10 @@ def start_background_check(channels, manager=None):
             
             # Procesamos de 2 en 2
             for i in range(0, len(channel_ids), batch_size):
+                from ..utils.config import Config
+                if not Config().checkstatus_enabled:
+                    logger.info("Stopping checking status: The user has deactivated it.")
+                    break
                 batch_ids = channel_ids[i:i + batch_size]
                 with app.app_context():
                     # RE-CONSULTA: Vital para evitar el error de SQLite de hilos
