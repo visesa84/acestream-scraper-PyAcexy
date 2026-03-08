@@ -189,6 +189,13 @@
 					<form id="editChannelForm" class="row g-3">
 						<input type="hidden" id="editChannelId">
 						
+						<div class="form-check form-switch mb-3">
+							<input class="form-check-input" type="checkbox" id="editChannelStatus">
+							<label class="form-check-label" for="editChannelStatus">
+								Channel: <span id="statusLabelText" class="fw-bold">Active</span>
+							</label>
+						</div>
+					
 						<div class="col-md-6">
 							<label for="editChannelName" class="form-label">Channel Name</label>
 							<input type="text" class="form-control" id="editChannelName" required>

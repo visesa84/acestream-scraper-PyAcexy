@@ -189,6 +189,7 @@ class TaskManager:
                         cutoff = datetime.now(timezone.utc) - timedelta(hours=config.checkstatus_interval)
                         
                         channels = AcestreamChannel.query.filter(
+                            (AcestreamChannel.status == 'active'),
                             (AcestreamChannel.last_processed.is_(None)) |
                             (AcestreamChannel.last_processed < cutoff)
                         ).all()

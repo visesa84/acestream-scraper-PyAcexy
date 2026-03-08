@@ -99,13 +99,28 @@ class ChannelList(Resource):
         
         # Apply filters
         if search_query:
-            query = query.filter(
-                or_(
-                    AcestreamChannel.name.ilike(f'%{search_query}%'),
-                    AcestreamChannel.id.ilike(f'%{search_query}%'),
-                    AcestreamChannel.group.ilike(f'%{search_query}%')
+            search_lower = search_query.lower().strip()
+            
+            # Filtro por estado de conexión usando .is_()
+            if search_lower == 'online':
+                query = query.filter(
+                    AcestreamChannel.is_online.is_(True),
+                    AcestreamChannel.status == 'active'
                 )
-            )
+            elif search_lower == 'offline':
+                query = query.filter(
+                    AcestreamChannel.is_online.is_(False),
+                    AcestreamChannel.status == 'active'
+                )
+            else:    
+                query = query.filter(
+                    or_(
+                        AcestreamChannel.name.ilike(f'%{search_query}%'),
+                        AcestreamChannel.id.ilike(f'%{search_query}%'),
+                        AcestreamChannel.group.ilike(f'%{search_query}%'),
+                        AcestreamChannel.status.ilike(f'%{search_query}%')
+                    )
+                )
         
         # Filter by URL ID if provided
         if url_id:
@@ -227,9 +242,11 @@ class Channel(Resource):
             if not data:
                 api.abort(400, 'No data provided')
             
-            # Update fields if provided
+            # 1. Actualizar campos
             if 'name' in data:
                 channel.name = data['name']
+            if 'status' in data:
+                channel.status = data['status']
             if 'group' in data:
                 channel.group = data['group']
             if 'logo' in data:
@@ -238,23 +255,32 @@ class Channel(Resource):
                 channel.tvg_id = data['tvg_id']
             if 'tvg_name' in data:
                 channel.tvg_name = data['tvg_name']
-            if 'original_url' in data:
-                channel.original_url = data['original_url']
-            if 'm3u_source' in data:
-                channel.m3u_source = data['m3u_source']
             if 'epg_update_protected' in data:
                 channel.epg_update_protected = bool(data['epg_update_protected'])
                 
-            # Save changes
+            # 2. Guardar cambios en DB
             channel_repo.commit()
+            
+            # 3. EXTRAER datos antes de cerrar la sesión
+            # Esto evita el error de "DetachedInstanceError"
+            res_id = channel.id
+            res_name = channel.name
+            
+            # 4. AHORA SÍ, cerramos la sesión para liberar SQLite
+            from app.extensions import db
+            db.session.remove()
             
             return {
                 'message': 'Channel updated successfully',
-                'id': channel.id,
-                'name': channel.name
+                'id': res_id,
+                'name': res_name
             }
+            
         except Exception as e:
             logger.error(f"Error updating channel: {e}", exc_info=True)
+            # Asegúrate de limpiar la sesión incluso si hay error
+            from app.extensions import db
+            db.session.remove()
             api.abort(500, str(e))
     
     @api.doc('delete_channel')

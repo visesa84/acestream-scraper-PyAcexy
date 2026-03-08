@@ -108,14 +108,14 @@ sleep 10
 cd /app
 echo "Starting Flask application on port $FLASK_PORT..."
 exec gunicorn --bind "0.0.0.0:$FLASK_PORT" \
-    --workers 1 \
-    --threads 12 \
+    --workers 4 \
+    --threads 4 \
     --worker-class gthread \
-    --timeout 30 \
-    --keep-alive 2 \
+    --timeout 300 \
+    --keep-alive 5 \
     --log-level info \
 	--forwarded-allow-ips="*" \
-    "wsgi:flask_app"
+    "wsgi:app"
 
 echo "Flask application logs available at $LOG_DIR/gunicorn-access.log and $LOG_DIR/gunicorn-error.log"
 

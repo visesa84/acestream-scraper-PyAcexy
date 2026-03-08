@@ -183,7 +183,11 @@ class PlaylistService:
         # Process each TV channel
         for tv_channel in sorted_channels:
             # Get all acestreams for this TV channel, prioritize online and best quality
-            acestreams = AcestreamChannel.query.filter_by(tv_channel_id=tv_channel.id).all()
+            # acestreams = AcestreamChannel.query.filter_by(tv_channel_id=tv_channel.id).all()
+            acestreams = AcestreamChannel.query.filter(
+                AcestreamChannel.tv_channel_id == tv_channel.id,
+                AcestreamChannel.status == 'active'
+            ).all()
             
             # Skip channels without acestreams
             if not acestreams:
@@ -297,7 +301,11 @@ class PlaylistService:
                 continue
                 
             # Get all acestreams for this TV channel
-            acestreams = AcestreamChannel.query.filter_by(tv_channel_id=tv_channel.id).all()
+            # acestreams = AcestreamChannel.query.filter_by(tv_channel_id=tv_channel.id).all()
+            acestreams = AcestreamChannel.query.filter(
+                AcestreamChannel.tv_channel_id == tv_channel.id,
+                AcestreamChannel.status == 'active'
+            ).all()
             if not acestreams:
                 continue
                 
@@ -446,8 +454,11 @@ class PlaylistService:
         
         # Process TV channels and their acestreams first
         for tv_channel in sorted_channels:
-            acestreams = AcestreamChannel.query.filter_by(tv_channel_id=tv_channel.id).all()
-            
+            # acestreams = AcestreamChannel.query.filter_by(tv_channel_id=tv_channel.id).all()
+            acestreams = AcestreamChannel.query.filter(
+                AcestreamChannel.tv_channel_id == tv_channel.id,
+                AcestreamChannel.status == 'active'
+            ).all()
             if not acestreams:
                 continue
                 
@@ -521,7 +532,11 @@ class PlaylistService:
         
         # Now process unassigned acestreams if requested
         if include_unassigned:
-            unassigned_query = AcestreamChannel.query.filter_by(tv_channel_id=None)
+            # unassigned_query = AcestreamChannel.query.filter_by(tv_channel_id=None)
+            unassigned_query = AcestreamChannel.query.filter(
+                AcestreamChannel.tv_channel_id == None,
+                AcestreamChannel.status == 'active'
+            )
             if search_term:
                 unassigned_query = unassigned_query.filter(
                     AcestreamChannel.name.ilike(f'%{search_term}%')
@@ -583,29 +598,35 @@ class PlaylistService:
         return '\n'.join(playlist_lines)
         
     def generate_online_only_playlist(self, search_term=None, base_url=None):
+        """Generate M3U playlist with ONLY active and online acestreams."""
         playlist_lines = ['#EXTM3U']
         
-        # Obtenemos los canales online
-        online_acestreams = AcestreamChannel.query.filter(
+        query = AcestreamChannel.query.filter(
             AcestreamChannel.status == 'active',
-            AcestreamChannel.is_online == True
-        ).all()
+            AcestreamChannel.is_online.is_(True)
+        )
 
+        # 2. Si hay término de búsqueda, filtramos por nombre en la DB
+        if search_term:
+            query = query.filter(AcestreamChannel.name.ilike(f'%{search_term}%'))
+
+        # Ejecutamos la consulta
+        online_acestreams = query.all()
+
+        # 3. Ordenamos por nombre (insensible a mayúsculas)
         online_acestreams = sorted(online_acestreams, key=lambda x: (x.name or "").lower())
         
         name_counts = {}
         local_id = 0
         
         for acestream in online_acestreams:
-            # Filtro de búsqueda
-            if search_term and search_term.lower() not in (acestream.name or "").lower():
-                continue
-
+            
             stream_url = self._format_stream_url(acestream.id, local_id, base_url=base_url)
             local_id += 1
 
             base_name = (acestream.name or "").strip()
             
+            # Manejo de nombres duplicados
             if base_name in name_counts:
                 name_counts[base_name] += 1
                 display_name = f"{base_name} #{name_counts[base_name]}"
@@ -613,7 +634,7 @@ class PlaylistService:
                 name_counts[base_name] = 1
                 display_name = base_name
             
-            # Metadatos
+            # Construcción de Metadatos EPG
             metadata = []            
             if acestream.tvg_name:
                 metadata.append(f'tvg-name="{acestream.tvg_name}"')
@@ -624,8 +645,9 @@ class PlaylistService:
             if acestream.group:
                 metadata.append(f'group-title="{acestream.group}"')
             
-            # Construcción de la línea (Ya corregida con el espacio del join)
-            extinf = f'#EXTINF:-1 {" ".join(metadata)},{display_name}'
+            # Formato EXTINF con metadatos unidos por espacios
+            metadata_str = f" {' '.join(metadata)}" if metadata else ""
+            extinf = f'#EXTINF:-1{metadata_str},{display_name}'
             
             playlist_lines.append(extinf)
             playlist_lines.append(stream_url)

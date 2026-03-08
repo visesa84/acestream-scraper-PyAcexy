@@ -2,7 +2,6 @@ import sys
 import subprocess
 import os
 from app import create_app
-from asgiref.wsgi import WsgiToAsgi
 from whitenoise import WhiteNoise
 
 # 1. Migraciones
