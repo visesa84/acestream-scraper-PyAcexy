@@ -255,6 +255,10 @@ class Channel(Resource):
                 channel.tvg_id = data['tvg_id']
             if 'tvg_name' in data:
                 channel.tvg_name = data['tvg_name']
+            if 'original_url' in data:
+                channel.original_url = data['original_url']
+            if 'm3u_source' in data:
+                channel.m3u_source = data['m3u_source']
             if 'epg_update_protected' in data:
                 channel.epg_update_protected = bool(data['epg_update_protected'])
                 

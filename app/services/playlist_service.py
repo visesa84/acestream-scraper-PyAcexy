@@ -183,7 +183,6 @@ class PlaylistService:
         # Process each TV channel
         for tv_channel in sorted_channels:
             # Get all acestreams for this TV channel, prioritize online and best quality
-            # acestreams = AcestreamChannel.query.filter_by(tv_channel_id=tv_channel.id).all()
             acestreams = AcestreamChannel.query.filter(
                 AcestreamChannel.tv_channel_id == tv_channel.id,
                 AcestreamChannel.status == 'active'
@@ -301,7 +300,6 @@ class PlaylistService:
                 continue
                 
             # Get all acestreams for this TV channel
-            # acestreams = AcestreamChannel.query.filter_by(tv_channel_id=tv_channel.id).all()
             acestreams = AcestreamChannel.query.filter(
                 AcestreamChannel.tv_channel_id == tv_channel.id,
                 AcestreamChannel.status == 'active'
@@ -454,7 +452,6 @@ class PlaylistService:
         
         # Process TV channels and their acestreams first
         for tv_channel in sorted_channels:
-            # acestreams = AcestreamChannel.query.filter_by(tv_channel_id=tv_channel.id).all()
             acestreams = AcestreamChannel.query.filter(
                 AcestreamChannel.tv_channel_id == tv_channel.id,
                 AcestreamChannel.status == 'active'
@@ -532,7 +529,6 @@ class PlaylistService:
         
         # Now process unassigned acestreams if requested
         if include_unassigned:
-            # unassigned_query = AcestreamChannel.query.filter_by(tv_channel_id=None)
             unassigned_query = AcestreamChannel.query.filter(
                 AcestreamChannel.tv_channel_id == None,
                 AcestreamChannel.status == 'active'
