@@ -25,28 +25,34 @@ Docker Compose provides the easiest way to get started with Acestream Scraper.
    services:
      acestream-scraper:
        image: visesa84/acestream-scraper-pyacexy
-       container_name: acestream-scraper
+       container_name: Acestream_Proxy
+	   restart: unless-stopped
+		cap_add:
+		  - NET_ADMIN
+		  - SYS_ADMIN
+		devices:
+		  - /dev/net/tun:/dev/net/tun
+		sysctls:
+		  - net.ipv4.conf.all.src_valid_mark=1
+		  - net.ipv4.ip_forward=1
        environment:
          - TZ=Europe/Madrid
 		 - ENABLE_TOR=false
 		 - ENABLE_ACEXY=true
 		 - ENABLE_ACESTREAM_ENGINE=true
 		 - ENABLE_WARP=false
-		 - WARP_ENABLE_NAT=true
-		 - WARP_ENABLE_IPV6=false
-		 - IPV6_DISABLED=true
+		 - WARP_LICENSE_KEY=
 		 - ACESTREAM_HTTP_PORT=6878
 		 - ACESTREAM_HTTP_HOST=ACEXY_HOST
 		 - FLASK_PORT=8040
 		 - ACEXY_LISTEN_ADDR=:8080
 		 - ACEXY_HOST=localhost
 		 - ACEXY_PORT=6878
-		 - ALLOW_REMOTE_ACCESS=no
 		 - ACEXY_NO_RESPONSE_TIMEOUT=15
-		 - ACEXY_BUFFER_SIZE=5
+		 - ACEXY_BUFFER_SIZE=10
 		 - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 		 - MALLOC_CONF=dirty_decay_ms:1000,muzzy_decay_ms:1000
-		 - EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory"
+		 - EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory --live-cache-size 209715200"
        ports:
          - "8040:8040"  # Flask application
          - "8080:8080"  # Acexy proxy
@@ -57,7 +63,6 @@ Docker Compose provides the easiest way to get started with Acestream Scraper.
        volumes:
          - ./data/zeronet:/app/ZeroNet/data
          - ./data/config:/app/config
-       restart: unless-stopped
        healthcheck:
          test: ["CMD", "/app/healthcheck.sh"]
          interval: 30s
@@ -101,7 +106,6 @@ docker run -d \
   -p 8080:8080 \
   -e ENABLE_ACEXY=true \
   -e ENABLE_ACESTREAM_ENGINE=true \
-  -e ALLOW_REMOTE_ACCESS=yes \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest

@@ -70,7 +70,6 @@ Create or edit `config/config.json`:
 | `ENABLE_ACESTREAM_ENGINE` | Enable built-in Acestream Engine | Matches `ENABLE_ACEXY` | Set to `true` to run Acestream in the container |
 | `ACESTREAM_HTTP_PORT` | Port for Acestream engine | `6878` | Internal Acestream Engine HTTP port |
 | `ACESTREAM_HTTP_HOST` | Host for Acestream engine | Uses `ACEXY_HOST` | Address to access Acestream Engine |
-| `ALLOW_REMOTE_ACCESS` | Allow remote connections to Acestream | `no` | Set to `yes` to allow external connections |
 
 ### PyAcexy Configuration
 
@@ -110,7 +109,6 @@ Cloudflare WARP provides enhanced privacy and secure connection options:
 | Variable | Description | Default | Notes |
 |----------|-------------|---------|-------|
 | `ENABLE_WARP` | Enable Cloudflare WARP | `false` | Requires `NET_ADMIN` and `SYS_ADMIN` capabilities |
-| `WARP_ENABLE_NAT` | Enable NAT for WARP traffic | `true` | Allows routing traffic through WARP tunnel |
 | `WARP_LICENSE_KEY` | WARP license key | - | Optional: For WARP+ or Team accounts |
 
 ### Docker Example with WARP Enabled
@@ -120,6 +118,9 @@ docker run -d \
   -p 8040:8040 \
   --cap-add NET_ADMIN \
   --cap-add SYS_ADMIN \
+  --device /dev/net/tun:/dev/net/tun \
+  --sysctl net.ipv4.conf.all.src_valid_mark=1 \
+  --sysctl net.ipv4.ip_forward=1 \
   -e ENABLE_WARP=true \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
@@ -135,9 +136,11 @@ services:
   acestream-scraper:
     image: visesa84/acestream-scraper-pyacexy:latest
     container_name: acestream-scraper
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
     environment:
       - TZ=Europe/Madrid
       - ENABLE_WARP=true
@@ -413,7 +416,6 @@ labels:
 
 - Add your domain(s) to `ui_host` in ZeroNet config for public access
 - Always include `localhost` in `ui_host` for local access
-- Set `ALLOW_REMOTE_ACCESS=no` to restrict Acestream access to localhost only
 - Consider using a reverse proxy with SSL/TLS for secure access
 - Configure a Custom Location in the Proxy to route the /ace path to port 8080. The URL generator utilizes Access List from Reverse Proxy to inject credentials and the domain into the streaming links
 - Be aware of copyright and legal considerations when sharing playlists

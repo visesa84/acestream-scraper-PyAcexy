@@ -16,7 +16,7 @@ Acestream Scraper is a management layer that works with Acestream Engine. The En
 
 ### What's the difference between Acestream Engine and Acexy?
 - **Acestream Engine**: The core technology that handles the P2P streaming
-- **Acexy**: An enhanced proxy interface for Acestream Engine that manages multiple connections efficiently
+- **PyAcexy**: An enhanced proxy interface for Acestream Engine that manages multiple connections efficiently
 
 Acexy acts as a connection manager between clients and the Acestream Engine. When multiple users access the same stream, the Acestream Engine needs a unique process identifier (PID) for each connection to handle them independently. Without proper PID management, when one stream ends, it might affect other clients.
 
@@ -51,9 +51,9 @@ No, as long as you've properly mounted the volumes for `/app/config` and (if usi
 - **base_url**: The URL format used in the generated M3U playlists (e.g., `acestream://` or `http://localhost:6878/ace/getstream?id=`)
 - **ace_engine_url**: The URL of your Acestream Engine for checking channel status (e.g., `http://localhost:6878`)
 
-### What's the difference between Acestream Engine and Acexy?
+### What's the difference between Acestream Engine and PyAcexy?
 - **Acestream Engine**: The core technology that handles the P2P streaming
-- **Acexy**: An enhanced proxy interface for Acestream Engine
+- **PyAcexy**: An enhanced proxy interface for Acestream Engine
 
 ### Which Base URL format should I use?
 It depends on your setup:
@@ -79,10 +79,13 @@ Cloudflare WARP is a privacy-focused VPN-like service that encrypts your traffic
 You need to add specific Docker capabilities and environment variables:
 ```bash
 docker run -d \
+  -p 8040:8040 \
   --cap-add NET_ADMIN \
   --cap-add SYS_ADMIN \
+  --device /dev/net/tun:/dev/net/tun \
+  --sysctl net.ipv4.conf.all.src_valid_mark=1 \
+  --sysctl net.ipv4.ip_forward=1 \
   -e ENABLE_WARP=true \
-  -p 8040:8040 \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
@@ -90,8 +93,6 @@ docker run -d \
 
 ### What WARP modes are available?
 - **WARP**: Full tunnel mode - routes all traffic through WARP
-- **DoT**: DNS-over-TLS mode - only DNS traffic is secured
-- **Proxy**: Proxy mode - selective routing through WARP
 - **Off**: WARP disabled but the service remains running
 
 ### How do I use WARP+ or Team features?
@@ -184,8 +185,7 @@ Common issues include:
 ### WARP shows as "Running but Not Connected"
 1. Check the WARP section in the Configuration page
 2. Try clicking the "Connect" button
-3. If connection fails, try changing the WARP mode to a different setting
-4. Ensure your container has the proper capabilities (`NET_ADMIN` and `SYS_ADMIN`)
+4. Ensure your container has the proper capabilities (`NET_ADMIN`, `SYS_ADMIN`, `DEVICE` and `SYSCTL`, )
 5. Check container logs for WARP-related errors
 
 ### I can see Acestream channels on a website in my browser, but the app doesn't find any when scraping it

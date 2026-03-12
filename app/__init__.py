@@ -2,7 +2,7 @@ import os
 import asyncio
 import threading
 import logging
-import fasteners  # IMPORTANTE: Añadir a requirements.txt
+import fasteners
 from flask import Flask, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 from app.extensions import db, migrate
@@ -65,17 +65,16 @@ def create_app(test_config=None):
     migrate.init_app(app, db)
 
     # 3. Registrar Blueprints
-    try:
-        from app.api import bp as api_blueprint
-        app.register_blueprint(api_blueprint, url_prefix='/api')
-        
-        from app.views.main import bp as main_blueprint
-        app.register_blueprint(main_blueprint)
-        
-        # Inyectar task_manager en el blueprint
-        main_blueprint.task_manager = task_manager
-    except Exception as e:
-        logger.warning(f"Error registering blueprints: {e}")
+    from app.api import bp as api_blueprint
+    app.register_blueprint(api_blueprint, url_prefix='/api')
+    
+    # Importamos el blueprint y el módulo para inyectar el manager
+    from app.views.main import bp as main_blueprint
+    import app.views.main as main_module
+    
+    # Inyectar el task_manager global en el módulo de vistas
+    main_module.task_manager = task_manager
+    app.register_blueprint(main_blueprint)
 
     # 4. Inicialización con Contexto de Aplicación
     is_testing = test_config == 'testing' or os.environ.get('TESTING') == '1'
@@ -95,45 +94,40 @@ def create_app(test_config=None):
                 task_manager.init_app(app)
 
                 def run_background_loop():
-                    # Definimos el archivo de bloqueo (compartido entre los 4 workers de Gunicorn)
+                    # Archivo de bloqueo para evitar múltiples hilos en workers de Gunicorn
                     lock = fasteners.InterProcessLock('/tmp/task_manager.lock')
-                    
-                    # Intentamos obtener el lock (sin bloquear al worker de Gunicorn)
                     got_lock = lock.acquire(blocking=False)
                     
                     if not got_lock:
                         logger.info("[Worker] TaskManager is already active in another process. Skipping.")
                         return
 
-                    logger.info("[MANAGER] Lock acquired! This worker will execute the stream loop.")
+                    logger.info("[MANAGER] Lock acquired! Starting stream loop.")
                     
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     try:
-                        # Ejecutamos tu bucle infinito
                         loop.run_until_complete(task_manager.start())
                     except Exception as e:
                         logger.error(f"Task Manager loop crashed: {e}")
                     finally:
-                        # Si el bucle termina o falla, liberamos para que otro worker tome el relevo
                         if lock.exists():
                             lock.release()
                         loop.close()
                 
-                # Lanzamos el hilo. Solo el primer worker que gane el lock continuará.
                 thread = threading.Thread(
                     target=run_background_loop, 
                     name="TaskManagerThread", 
                     daemon=True
                 )
                 thread.start()
-                logger.info("TaskManager thread initialized (Lock pending check)")
 
         except Exception as e:
             logger.error(f"Fatal error during app startup: {e}", exc_info=True)
 
     @app.route('/')
     def index():
+        # Ahora main.dashboard existirá porque el Blueprint se registró correctamente
         return redirect(url_for('main.dashboard'))
 
     return app

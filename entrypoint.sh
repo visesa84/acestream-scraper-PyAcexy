@@ -67,12 +67,9 @@ fi
 # Start Acestream Engine if enabled
 if [ "$ENABLE_ACESTREAM_ENGINE" = "true" ]; then
     echo "Starting Acestream engine..."
-	# Definir valores por defecto si las variables están vacías
-    BUFFER=${ACEXY_BUFFER_SIZE:-30}
-    if [ "$ALLOW_REMOTE_ACCESS" = "yes" ]; then
-        EXTRA_FLAGS="$EXTRA_FLAGS --bind-all"
-    fi
-    /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $BUFFER >> "$LOG_DIR/acestream.log" 2>&1 &  
+	# Limpiar posibles comillas literales que hayan quedado en la variable
+	EXTRA_FLAGS=$(echo $EXTRA_FLAGS | sed 's/"//g')
+    /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream.log" 2>&1 &  
     sleep 3 # Brief pause to allow Acestream engine to start
     echo "Acestream engine logs available at $LOG_DIR/acestream.log"
 fi
@@ -107,21 +104,20 @@ sleep 10
 # Start Flask app with Gunicorn
 cd /app
 echo "Starting Flask application on port $FLASK_PORT..."
-exec gunicorn --bind "0.0.0.0:$FLASK_PORT" \
+gunicorn --bind "0.0.0.0:$FLASK_PORT" \
     --workers 4 \
     --threads 4 \
     --worker-class gthread \
     --timeout 300 \
     --keep-alive 5 \
     --log-level info \
-	--forwarded-allow-ips="*" \
-    "wsgi:app"
+    --forwarded-allow-ips="*" \
+    "wsgi:app" &
+GUNICORN_PID=$!
 
-echo "Flask application logs available at $LOG_DIR/gunicorn-access.log and $LOG_DIR/gunicorn-error.log"
-
-# Monitor processes
 echo "Services started. Monitoring processes..."
-trap "echo 'Shutting down services...'; kill $(jobs -p)" EXIT INT TERM QUIT
+# El trap ahora sí funcionará para limpiar todo al cerrar el contenedor
+trap "kill $GUNICORN_PID $ZERONET_PID; exit" INT TERM EXIT
 
-# Wait for any process to exit
-wait
+# Mantenemos el contenedor vivo monitorizando gunicorn
+wait $GUNICORN_PID

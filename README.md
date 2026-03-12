@@ -18,13 +18,14 @@ A Python-based web scraping application that retrieves Acestream channel informa
 - **Built-in Acestream engine with PyAcexy proxy (optional)**
 - **Support for external Acestream Engine instances**
 - **Cloudflare WARP integration for enhanced privacy and geo-unblocking**
-- Channel status checking
+- Channel Status Checking
 - PyAcexy status display in the dashboard
 - **Interactive setup wizard for easy configuration**
 - **Channel search functionality**
 - **Automatic rescraping at configurable intervals**
 - **API documentation via OpenAPI/Swagger UI**
 - **Enhanced health checking for all components**
+- **Enable or disable Stream**
 
 ## Quick Start
 
@@ -39,15 +40,21 @@ A Python-based web scraping application that retrieves Acestream channel informa
      acestream-scraper:
        image: visesa84/acestream-scraper-pyacexy:latest
        container_name: acestream-scraper
+	   cap_add:
+		  - NET_ADMIN
+		  - SYS_ADMIN
+		devices:
+		  - /dev/net/tun:/dev/net/tun
+		sysctls:
+		  - net.ipv4.conf.all.src_valid_mark=1
+		  - net.ipv4.ip_forward=1
        environment:
 		 - TZ=Europe/Madrid
 		 - ENABLE_TOR=false
 		 - ENABLE_ACEXY=true
 		 - ENABLE_ACESTREAM_ENGINE=true
 		 - ENABLE_WARP=false
-		 - WARP_ENABLE_NAT=true
-		 - WARP_ENABLE_IPV6=false
-		 - IPV6_DISABLED=true
+		 - WARP_LICENSE_KEY=
 		 - ACESTREAM_HTTP_PORT=6878
 		 - ACESTREAM_HTTP_HOST=ACEXY_HOST
 		 - FLASK_PORT=8040
@@ -58,7 +65,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 		 - ACEXY_BUFFER_SIZE=5
 		 - LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 		 - MALLOC_CONF=dirty_decay_ms:1000,muzzy_decay_ms:1000
-		 - EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory"
+		 - EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory --live-cache-size 209715200"
        ports:
          - "8040:8040"  # Flask application
          - "8080:8080"  #  proxy
@@ -69,7 +76,6 @@ A Python-based web scraping application that retrieves Acestream channel informa
        volumes:
          - ./data/zeronet:/app/ZeroNet/data
          - ./data/config:/app/config
-       restart: unless-stopped
        healthcheck:
          test: ["CMD", "/app/healthcheck.sh"]
          interval: 30s
@@ -202,10 +208,14 @@ docker run -d \
   -p 8040:8040 \
   --cap-add NET_ADMIN \
   --cap-add SYS_ADMIN \
+  --device /dev/net/tun:/dev/net/tun \
+  --sysctl net.ipv4.conf.all.src_valid_mark=1 \
+  --sysctl net.ipv4.ip_forward=1 \
   -e ENABLE_WARP=true \
   -v "${PWD}/config:/app/config" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
+
 ```
 
 > **Note:** WARP integration requires additional capabilities (`NET_ADMIN` and `SYS_ADMIN`) to create and manage network tunnels.
@@ -333,7 +343,6 @@ PyAcexy provides an enhanced proxy interface for Acestream, with a web UI for be
 - `ACEXY_LISTEN_ADDR`: Address for PyAcexy to listen on (default: `:8080`)
 - `ACEXY_HOST`: Hostname of the Acestream Engine to connect to (default: `localhost`)
 - `ACEXY_PORT`: Port of the Acestream Engine to connect to (default: `6878`)
-- `ALLOW_REMOTE_ACCESS`: Set to `yes` to allow external connections (default: `no`)
 - `ACEXY_NO_RESPONSE_TIMEOUT`: Timeout for Acestream responses (default: `15`)
 - `ACEXY_BUFFER_SIZE`: Buffer size for data transfers (default: `5`)
 
@@ -342,7 +351,6 @@ PyAcexy provides an enhanced proxy interface for Acestream, with a web UI for be
 Cloudflare WARP provides enhanced privacy and secure tunneling:
 
 - `ENABLE_WARP`: Set to `true` to enable Cloudflare WARP (default: `false`)
-- `WARP_ENABLE_NAT`: Enable NAT for WARP traffic (default: `true`)
 - `WARP_LICENSE_KEY`: Optional license key for WARP+ or WARP Team
 
 #### Other Settings
@@ -430,7 +438,6 @@ The application includes proper headers handling for running behind a reverse pr
 
 - Add your domain(s) to `ui_host` for public access
 - Always include `localhost` for local access
-- Set `ALLOW_REMOTE_ACCESS=no` to restrict Acestream access to localhost only
 - Configure a Custom Location in the Proxy to route the /ace path to port 8080. The URL generator utilizes Access List from Reverse Proxy to inject credentials and the domain into the streaming links
 
 ### Healthchecks
