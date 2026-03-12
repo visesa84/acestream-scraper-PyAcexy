@@ -1,17 +1,41 @@
+# --- STAGE 0: Compilación de BoringTun Estable ---
+FROM rust:1.82-slim AS builder
+RUN apt-get update && apt-get install -y pkg-config libssl-dev git && \
+    # Clonamos el repo oficial
+    git clone https://github.com/cloudflare/boringtun.git /src
+
+WORKDIR /src
+
+# Usa las versiones exactas que Cloudflare probó
+RUN cargo install --locked --path boringtun-cli
+
 # --- STAGE 1: Base image con todas las dependencias ---
 FROM python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Base image for Acestream channel scraper with pyacexy" \
-      version="1.2"
+      version="1.7"
 
 WORKDIR /app
 RUN mkdir -p /app/config
 
-# Instalar dependencias del sistema necesarias para compilar
+# Copiamos el binario de BoringTun desde la etapa anterior
+COPY --from=builder /usr/local/cargo/bin/boringtun-cli /usr/local/bin/boringtun
+RUN chmod +x /usr/local/bin/boringtun
+
+# Renombramos el binario real
+RUN mv /usr/local/bin/boringtun /usr/local/bin/boringtun-real
+
+# Creamos un script que haga de "puente" y fuerce las opciones
+RUN echo '#!/bin/bash\n/usr/local/bin/boringtun-real --disable-drop-privileges "$@"' > /usr/local/bin/boringtun && \
+    chmod +x /usr/local/bin/boringtun
+
+# Instalar dependencias del sistema + herramientas de WireGuard
 RUN apt-get update && apt-get install -y \
     wget curl gnupg gcc python3-dev build-essential \
     tor git lsb-release apt-transport-https ca-certificates \
+    wireguard-tools iproute2 \
+	openresolv \
     && rm -rf /var/lib/apt/lists/*
 
 # Configuración de TOR
@@ -50,7 +74,7 @@ RUN mkdir -p ZeroNet && \
     mv zeronet-conservancy-master/* ZeroNet/ && \
     rm -rf ZeroNet.tar.gz zeronet-conservancy-master
 
-# Instalar Acestream Engine
+# Install Acestream Engine
 ENV ACESTREAM_VERSION="3.2.11_ubuntu_22.04_x86_64_py3.10"
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -58,6 +82,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apt-get update \
   && apt-get install --no-install-recommends -y \
       ca-certificates wget sudo \
+	  python3-gi \
+	  gir1.2-gtk-3.0 \
   && rm -rf /var/lib/apt/lists/* \
   #
   # Download acestream
@@ -69,29 +95,6 @@ RUN apt-get update \
   && pushd /opt/acestream || exit \
   && bash ./install_dependencies.sh \
   && popd || exit
-
-# Install Cloudflare WARP dependencies
-RUN apt-get update && apt-get install -y \
-    apt-transport-https \
-    gnupg \
-    curl \
-    lsb-release \
-    dirmngr \
-    ca-certificates \
-    --no-install-recommends
-
-# Add Cloudflare GPG key and repository
-RUN curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflare-client.list
-
-# Install Cloudflare WARP
-RUN apt-get update \
-	&& apt-get install -y libcap2-bin --no-install-recommends \
-	&& cp /bin/true /sbin/setcap \
-    && cp /bin/true /usr/sbin/setcap \
-	&& apt-get install -y cloudflare-warp \
-	&& rm /usr/sbin/setcap \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy the pyacexy
 RUN cp /opt/pyacexy/pyacexy/proxy.py /usr/local/bin/pyacexy && \
@@ -110,6 +113,7 @@ RUN cp /opt/pyacexy/pyacexy/proxy.py /usr/local/bin/pyacexy && \
 RUN chmod +x /usr/local/bin/pyacexy
 RUN chmod +x /usr/local/bin/aceid.py
 RUN chmod +x /usr/local/bin/copier.py
+RUN chmod +x /usr/local/bin/boringtun
 
 # Instalar la librería
 RUN apt-get update && apt-get install -y libjemalloc2 && rm -rf /var/lib/apt/lists/*
@@ -124,12 +128,12 @@ ENV TZ='Europe/Madrid'
 ENV ENABLE_TOR=false
 ENV ENABLE_ACEXY=true
 ENV ENABLE_ACESTREAM_ENGINE=true
+ENV WG_QUICK_USERSPACE_IMPLEMENTATION=boringtun
+ENV WG_THREADS=4
 ENV ENABLE_WARP=false
-ENV WARP_ENABLE_NAT=true
-ENV WARP_ENABLE_IPV6=false
+ENV WARP_LICENSE_KEY=
 ENV ACESTREAM_HTTP_PORT=6878
 ENV ACESTREAM_HTTP_HOST=ACEXY_HOST
-ENV IPV6_DISABLED=true
 ENV FLASK_PORT=8040
 ENV ACEXY_LISTEN_ADDR=":8080"
 ENV ACEXY_HOST="localhost"
@@ -138,19 +142,20 @@ ENV ALLOW_REMOTE_ACCESS="no"
 ENV ACEXY_BUFFER_SIZE=10
 ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so.2"
 ENV MALLOC_CONF="dirty_decay_ms:1000,muzzy_decay_ms:1000"
-ENV EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --cache-auto 1 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory"
+ENV EXTRA_FLAGS="--cache-dir /tmp --cache-limit 2 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory --live-cache-size 209715200"
 
 # Final image with application code
 FROM base
 
 # Update metadata labels for the final image
 LABEL description="Acestream channel scraper with ZeroNet support" \
-      version="1.2.14"
+      version="1.8"
 
 # Copy application files
 COPY --chmod=0755 entrypoint.sh /app/entrypoint.sh
 COPY --chmod=0755 healthcheck.sh /app/healthcheck.sh
 COPY --chmod=0755 warp-setup.sh /app/warp-setup.sh
+COPY --chmod=0755 wgcf /usr/local/bin/wgcf
 COPY requirements.txt requirements-prod.txt ./
 COPY migrations/ ./migrations/
 COPY migrations_app.py manage.py ./
@@ -158,7 +163,7 @@ COPY wsgi.py ./
 COPY app/ ./app/
 
 # FORZAMOS PERMISOS DE EJECUCIÓN
-RUN chmod +x /app/entrypoint.sh /app/healthcheck.sh /app/warp-setup.sh
+RUN chmod +x /app/entrypoint.sh /app/healthcheck.sh /app/warp-setup.sh /usr/local/bin/wgcf
 
 # Install the application dependencies
 RUN pip install --no-cache-dir -r requirements.txt && \

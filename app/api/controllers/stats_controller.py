@@ -45,8 +45,8 @@ class Stats(Resource):
             # Calculate channel stats more robustly
             total_channels = len(channels)
             channels_checked = sum(1 for ch in channels if ch.last_checked is not None)
-            channels_online = sum(1 for ch in channels if ch.last_checked is not None and ch.is_online is True)
-            channels_offline = sum(1 for ch in channels if ch.last_checked is not None and ch.is_online is False)
+            channels_online = sum(1 for ch in channels if ch.last_checked is not None and ch.is_online and ch.status == "active")
+            channels_offline = sum(1 for ch in channels if ch.last_checked is not None and (not ch.is_online or ch.status == "disabled"))
             
             # Build URL stats
             url_stats = []

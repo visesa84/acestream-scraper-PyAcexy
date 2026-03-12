@@ -1,58 +1,39 @@
-from flask import Blueprint, render_template, jsonify, request, Response, current_app, redirect, url_for
-from datetime import datetime, timedelta, timezone
-import asyncio
+from flask import Blueprint, render_template, request, Response, current_app, redirect, url_for
+from datetime import datetime, timezone
 import logging
-import os
-import requests
-from sqlalchemy import text
-from ..models import ScrapedURL, AcestreamChannel
-from ..extensions import db
-from ..utils.config import Config
-from ..tasks.manager import TaskManager
-from ..services import ScraperService, PlaylistService
-from ..repositories import URLRepository, ChannelRepository
-from ..services.channel_status_service import ChannelStatusService
 
 bp = Blueprint('main', __name__)
 logger = logging.getLogger(__name__)
 
-# Add a reference to the task manager
+# Referencia global para el manager
 task_manager = None
 
 @bp.route('/')
 def index():
-    """Main dashboard view."""
+    from ..utils.config import Config
     config = Config()
-    
-    # If config was imported from file, redirect to dashboard
     if config.settings_repo and config.settings_repo.is_setup_completed():
         return render_template('dashboard.html')
-        
-    # If no config imported, redirect to setup
     return redirect(url_for('main.setup'))
 
 @bp.route('/dashboard')
 def dashboard():
-    """Alternative endpoint for dashboard."""
     return index()
 
-@bp.route('/search')
-def search():
-    """Acestream search page."""
+@bp.route('/setup')
+def setup():
+    from ..utils.config import Config
     config = Config()
-    
-    # If config was not imported, redirect to setup
-    if not config.settings_repo or not config.settings_repo.is_setup_completed():
-        return redirect(url_for('main.setup'))
-        
-    return render_template('search.html')
+    if config.is_initialized():
+        return redirect(url_for('main.index'))
+    return render_template('setup.html')
 
 @bp.route('/playlist.m3u')
 def get_playlist():
-    """
-    Legacy endpoint for M3U playlist.
-    Maintains backward compatibility by directly serving the playlist.
-    """
+    from ..utils.config import Config
+    from ..services import PlaylistService
+    from ..repositories import URLRepository
+    
     config = Config()
     if not config.is_initialized() and not current_app.testing:
         return redirect(url_for('main.setup'))
@@ -62,15 +43,12 @@ def get_playlist():
     base_url_param = request.args.get('base_url', None)
     
     if refresh and task_manager:
-        from app.repositories import URLRepository
         url_repository = URLRepository()
         urls = url_repository.get_enabled()
-        
         for url in urls:
             task_manager.add_url(url.url)
     
     playlist_service = PlaylistService()
-    
     if base_url_param:
         original_base_url = playlist_service.config.base_url
         playlist_service.config.base_url = base_url_param
@@ -79,71 +57,48 @@ def get_playlist():
     else:
         playlist = playlist_service.generate_playlist(search_term=search)
     
-    filename = f"acestream_playlist_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-    if search:
-        filename += f"_filtered"
-    filename += ".m3u"
-    
-    return Response(
-        playlist,
-        mimetype="audio/x-mpegurl",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+    return Response(playlist, mimetype="audio/x-mpegurl")
+
+@bp.route('/search')
+def search():
+    from ..utils.config import Config
+    config = Config()
+    if not config.settings_repo or not config.settings_repo.is_setup_completed():
+        return redirect(url_for('main.setup'))
+    return render_template('search.html')
 
 @bp.route('/config')
 def config():
-    """Render the configuration page."""
     return render_template('config.html')
-
-@bp.route('/setup')
-def setup():
-    """Setup wizard view."""
-    config = Config()
-    if config.is_initialized():
-        current_app.logger.info("Configuration already initialized, redirecting to dashboard")
-        return redirect(url_for('main.index'))
-    return render_template('setup.html')
 
 @bp.route('/tv-channels')
 def tv_channels():
-    """TV channels management page."""
+    from ..utils.config import Config
     config = Config()
-    
-    # If config was not imported, redirect to setup
     if not config.settings_repo or not config.settings_repo.is_setup_completed():
         return redirect(url_for('main.setup'))
-        
     return render_template('tv_channels.html')
 
 @bp.route('/tv-channels/<int:tv_channel_id>')
 def tv_channel_detail(tv_channel_id):
-    """TV channel detail page showing information about a single TV channel."""
+    from ..utils.config import Config
     config = Config()
-    
-    # If config was not imported, redirect to setup
     if not config.settings_repo or not config.settings_repo.is_setup_completed():
         return redirect(url_for('main.setup'))
-        
     return render_template('tv_channel_detail.html', tv_channel_id=tv_channel_id)
 
 @bp.route('/streams')
 def streams():
-    """Acestream channels management page."""
+    from ..utils.config import Config
     config = Config()
-    
-    # If config was not imported, redirect to setup
     if not config.settings_repo or not config.settings_repo.is_setup_completed():
         return redirect(url_for('main.setup'))
-        
     return render_template('streams.html')
 
 @bp.route('/epg')
 def epg_management():
-    """EPG management page."""
+    from ..utils.config import Config
     config = Config()
-    
-    # If config was not imported, redirect to setup
     if not config.settings_repo or not config.settings_repo.is_setup_completed():
         return redirect(url_for('main.setup'))
-        
     return render_template('epg.html')

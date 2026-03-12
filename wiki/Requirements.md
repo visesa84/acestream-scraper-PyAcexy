@@ -33,7 +33,7 @@ If using Docker (recommended approach):
 
 - **Docker**: Version 19.03 or newer
 - **Docker Compose**: Version 1.27.0 or newer (if using docker-compose)
-- **Docker Capabilities**: NET_ADMIN and SYS_ADMIN (only if using Cloudflare WARP)
+- **Docker Capabilities**: NET_ADMIN, SYS_ADMIN, DEVICES and SYSCTLS (only if using Cloudflare WARP)
 
 ### Manual Installation
 

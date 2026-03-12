@@ -115,7 +115,7 @@ The configuration page allows you to modify system settings:
 - **Base URL**: How to format channel URLs in the playlist
 - **Ace Engine URL**: Connection to your Acestream Engine
 - **Rescrape Interval**: How often to automatically check for new channels
-- **Acexy Status**: View the status of the PyAcexy proxy (if enabled)
+- **PyAcexy Status**: View the status of the PyAcexy proxy (if enabled)
 - **Acestream Engine Status**: View the status of the Acestream Engine
 - **WARP Status**: View and manage Cloudflare WARP connection (if enabled)
 
@@ -126,14 +126,14 @@ If Cloudflare WARP is enabled in your container, you can manage it through the C
 #### WARP Status
 
 - View connection status (Connected, Running but Not Connected, Not Running)
-- See your current connection mode (WARP, DoT, Proxy, Off)
-- Check your account type (Free, Premium, Team)
+- See your current connection mode (WARP, Off)
+- Check your account type (Free, Premium)
 - View your public IP address through WARP
 
 #### WARP Controls
 
 - Connect/Disconnect from WARP
-- Change WARP mode (WARP, DoT, Proxy, Off)
+- Change WARP mode (WARP, Off)
 - Register a license key for WARP+ or Team accounts
 
 #### WARP Connection Details
@@ -207,7 +207,7 @@ When enabled, Cloudflare WARP provides these benefits:
 4. **Better Performance**: Optimized routing through Cloudflare's global network
 
 To use WARP features:
-1. Make sure the container is running with `-e ENABLE_WARP=true` and required capabilities (`--cap-add NET_ADMIN --cap-add SYS_ADMIN`)
+1. Make sure the container is running with `-e ENABLE_WARP=true` and required capabilities (`--cap-add NET_ADMIN --cap-add SYS_ADMIN --device /dev/net/tun:/dev/net/tun --sysctl net.ipv4.conf.all.src_valid_mark=1 --sysctl net.ipv4.ip_forward=1`)
 2. Navigate to the Configuration page
 3. Use the WARP controls to connect, disconnect, or change modes
 4. Optionally register a WARP+ or Team license for premium features

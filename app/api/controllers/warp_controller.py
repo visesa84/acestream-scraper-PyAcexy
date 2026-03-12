@@ -2,7 +2,7 @@ import logging
 import os
 from flask_restx import Namespace, Resource, fields
 from flask import request
-from app.services.warp_service import WarpService, WarpMode
+from app.services.warp_service import WarpService, WarpMode as ModeEnum
 
 logger = logging.getLogger(__name__)
 
@@ -103,38 +103,36 @@ class WarpDisconnect(Resource):
             handle_service_error(e, "disconnect from WARP")
 
 @api.route('/mode')
-class WarpMode(Resource):
+class WarpModeResource(Resource):
     @api.doc('set_warp_mode')
     @api.expect(mode_input_model)
-    @api.response(200, 'Mode set successfully')
-    @api.response(400, 'Invalid mode specified')
-    @api.response(403, 'WARP is not enabled')
-    @api.response(500, 'Failed to set mode')
     @api.marshal_with(response_model)
     def put(self):
         """Set the WARP mode"""
         if not is_warp_enabled():
-            return {'status': 'error', 'message': 'WARP is not enabled in this container'}, 403
+            return {'status': 'error', 'message': 'WARP is not enabled'}, 403
+        
+        data = request.json
+        mode_str = data.get('mode', '').lower()
+        
         try:
-            data = request.json
-            if not data or 'mode' not in data:
-                return {'status': 'error', 'message': 'Mode not specified'}, 400
-            
             try:
-                mode = WarpMode(data['mode'])
-                result = warp_service.set_mode(mode)
-                if result:
-                    return {'status': 'success', 'message': f'WARP mode set to {mode.value}'}, 200
-                else:
-                    return {'status': 'error', 'message': 'Failed to set WARP mode'}, 500
+                # ModeEnum(mode_str) busca el valor en el Enum definido en warp_service
+                target_mode = ModeEnum(mode_str)
             except ValueError:
-                valid_modes = [m.value for m in WarpMode]
-                return {
-                    'status': 'error', 
-                    'message': f'Invalid mode. Valid modes are: {", ".join(valid_modes)}'
-                }, 400
+                return {'status': 'error', 'message': f'Invalid mode: {mode_str}. Use: warp, dot, proxy or off'}, 400
+
+            # Pasamos el miembro del Enum al servicio
+            result = warp_service.set_mode(target_mode)
+            
+            if result:
+                return {'status': 'success', 'message': f'WARP mode changed to {mode_str}'}, 200
+            else:
+                return {'status': 'error', 'message': 'Failed to apply mode (check logs)'}, 500
+                
         except Exception as e:
-            handle_service_error(e, "set WARP mode")
+            # Esto atrapará cualquier error de referencia como el que tuviste
+            return {'status': 'error', 'message': f"Unexpected error: {str(e)}"}, 500
 
 @api.route('/license')
 class WarpLicense(Resource):
