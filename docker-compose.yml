@@ -43,6 +43,7 @@ services:
     volumes:
       - ./data/zeronet:/app/ZeroNet/data
       - ./data/config:/app/config
+      - ./data/recordings:/app/config/recordings
     healthcheck:
       test: ["CMD", "/app/healthcheck.sh"]
       interval: 30s

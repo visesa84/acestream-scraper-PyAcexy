@@ -20,4 +20,4 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 # Import models to ensure they're registered with SQLAlchemy
-from app.models import AcestreamChannel, ScrapedURL, Setting
+from app.models import AcestreamChannel, ScrapedURL, Setting, EPGProgram, RecordingSchedule

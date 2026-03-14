@@ -174,6 +174,9 @@ function updateChannelUI() {
     // Update stream information
     document.getElementById('detailTotalStreams').textContent = channelState.acestreams.length;
     document.getElementById('detailOnlineStreams').textContent = channelState.acestreams.filter(stream => stream.is_online).length;
+	
+	// Al final de updateChannelUI
+	updateEPGUI(channel);
 }
 
 /**
@@ -807,5 +810,101 @@ function formatLocalDate(dateString) {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
 }
 
-// Initialize the page when DOM is loaded
+/**
+ * Renderiza la programación, añade progreso al actual y gestiona botones de grabado
+ */
+function updateEPGUI(data) {
+    const programs = data.programs;
+    const container = document.getElementById('currentProgramContainer');
+    
+    if (!container || !programs || programs.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center my-4">No program information available</p>';
+        return;
+    }
+
+    const now = new Date();
+    let html = '<div class="list-group list-group-flush">';
+
+    programs.forEach(function(prog) {
+        // Directo al constructor porque ya viene en formato ISO
+        const start = new Date(prog.start);
+        const stop = new Date(prog.stop);
+        const isLive = now >= start && now <= stop;
+        
+        const isScheduled = prog.is_recording === true; 
+        const btnClass = isScheduled ? 'btn-danger active' : 'btn-outline-danger';
+        const btnText = isScheduled ? '✓ Scheduled' : '● Record';
+
+        let progressBar = '';
+        if (isLive) {
+            const percentage = Math.min(Math.max(((now - start) / (stop - start)) * 100, 0), 100);
+            progressBar = `
+                <div class="progress my-2" style="height: 6px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: ${percentage}%"></div>
+                </div>`;
+        }
+
+        html += `
+            <div class="list-group-item px-0 py-3 border-0 border-bottom ${isLive ? 'bg-light rounded px-2' : ''}">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <div>
+                        <span class="badge ${isLive ? 'bg-primary' : 'text-primary border'}">${prog.time_display}</span>
+                        ${isLive ? '<span class="badge bg-danger ms-1">LIVE</span>' : ''}
+                    </div>
+                    <button id="btn-rec-${prog.id}" 
+                            class="btn btn-sm ${btnClass}" 
+                            onclick="toggleRecord(${prog.id})">
+                        ${btnText}
+                    </button>
+                </div>
+                <h6 class="mb-1 fw-bold ${isLive ? 'text-primary' : ''}">${prog.title}</h6>
+                ${progressBar}
+                <p class="mb-0 mt-2 small text-muted">${prog.desc || ''}</p>
+            </div>`;
+    });
+
+    container.innerHTML = html + '</div>';
+}
+
+/**
+ * Activa o desactiva la grabación en el servidor
+ */
+function toggleRecord(programId) {
+    const btn = document.getElementById(`btn-rec-${programId}`);
+    const isAdding = !btn.classList.contains('active');
+    const originalHTML = btn.innerHTML;
+
+    // Feedback visual: mostrar spinner mientras carga
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    fetch('/api/recordings/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ program_id: programId })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Server response error');
+        return res.json();
+    })
+    .then(data => {
+        // Actualizar botón según la respuesta del Repository (status: 'scheduled' o 'removed')
+        if (data.status === 'scheduled') {
+            btn.innerHTML = '<i class="bi bi-check-circle"></i> Scheduled';
+            btn.className = 'btn btn-sm btn-danger active';
+        } else {
+            btn.innerHTML = '● Record';
+            btn.className = 'btn btn-sm btn-outline-danger';
+        }
+    })
+    .catch(err => {
+        console.error('Error toggling recording:', err);
+        btn.innerHTML = originalHTML; // Revertir si hay error
+        alert("Could not process recording. Check server logs.");
+    });
+}
+
+// Inicializar la página cuando el DOM esté cargado
 document.addEventListener('DOMContentLoaded', initializeDetailPage);
+
+// Refresca los datos del canal y la EPG cada 1 minuto automáticamente
+setInterval(loadChannelData, 60000);

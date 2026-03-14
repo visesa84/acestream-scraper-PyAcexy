@@ -6,8 +6,6 @@ Acestream Scraper is a Python-based web application that automatically retrieves
 
 Built using Flask, BeautifulSoup, and SQLAlchemy, this application provides a comprehensive solution for managing and accessing Acestream channels through an intuitive web interface.
 
-[![Release Pipeline](https://github.com/Pipepito/acestream-scraper/actions/workflows/release.yml/badge.svg)](https://github.com/Pipepito/acestream-scraper/actions/workflows/release.yml)
-
 ## Key Features
 
 - **Automated Channel Discovery**: Scrapes Acestream channel information from multiple URLs
@@ -54,6 +52,6 @@ This project is licensed under the MIT License.
 ## Acknowledgements
 
 Special thanks to the developers of Flask, BeautifulSoup, SQLAlchemy, and other dependencies used in this project.
-
-- [Acexy](https://github.com/Javinator9889/acexy) - Enhanced Acestream proxy interface
+- [Acestream-scrapper](https://github.com/Pipepito/acestream-scraper) - Enhanced Acestream Scraper interface
+- [Pyacexy](https://github.com/wafy80/pyacexy) - Enhanced Acestream proxy interface with Python
 - [Acestream-http-proxy](https://github.com/martinbjeldbak/acestream-http-proxy) - HTTP proxy for Acestream

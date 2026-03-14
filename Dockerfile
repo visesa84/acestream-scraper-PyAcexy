@@ -14,7 +14,7 @@ FROM python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Base image for Acestream channel scraper with pyacexy" \
-      version="1.7"
+      version="1.9"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -60,7 +60,8 @@ RUN pip install --no-cache-dir \
     "coincurve" \
     "base58" \
     "defusedxml" \
-    "rsa"
+    "rsa" \
+	"psutil"
 
 # --- INSTALACIÓN DE PYACEXY ---
 RUN git clone https://github.com/wafy80/pyacexy /opt/pyacexy && \
@@ -84,6 +85,7 @@ RUN apt-get update \
       ca-certificates wget sudo \
 	  python3-gi \
 	  gir1.2-gtk-3.0 \
+	  ffmpeg \
   && rm -rf /var/lib/apt/lists/* \
   #
   # Download acestream
@@ -149,7 +151,7 @@ FROM base
 
 # Update metadata labels for the final image
 LABEL description="Acestream channel scraper with ZeroNet support" \
-      version="1.8"
+      version="1.9"
 
 # Copy application files
 COPY --chmod=0755 entrypoint.sh /app/entrypoint.sh
@@ -182,6 +184,7 @@ EXPOSE 6878
 # Set the volume
 VOLUME ["/app/ZeroNet/data"]
 VOLUME ["/app/config"]
+VOLUME ["/app/config/recordings"]
 
 # Make sure WORKDIR is set correctly
 WORKDIR /app

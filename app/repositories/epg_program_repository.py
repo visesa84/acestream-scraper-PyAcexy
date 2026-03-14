@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import and_, or_
 from app.extensions import db
 from app.models.epg_program import EPGProgram
+from app.models.recording_schedule import RecordingSchedule
 from sqlalchemy.dialects.sqlite import insert
 import logging
 
@@ -42,17 +43,30 @@ class EPGProgramRepository:
         """Get program by ID."""
         return EPGProgram.query.get(program_id)
     
-    def get_programs_for_channel(self, epg_channel_id: int, start_time: datetime = None, end_time: datetime = None) -> List[EPGProgram]:
-        """Get all programs for a specific EPG channel within a time range."""
-        query = EPGProgram.query.filter(EPGProgram.epg_channel_id == epg_channel_id)
+    def get_programs_for_channel(self, epg_channel_id: int, start_time: datetime = None, end_time: datetime = None):
+        # Consulta limpia de programas para el canal específico
+        programs = EPGProgram.query.filter_by(epg_channel_id=epg_channel_id).order_by(EPGProgram.start_time).all()
         
-        if start_time:
-            query = query.filter(EPGProgram.end_time > start_time)
-        
-        if end_time:
-            query = query.filter(EPGProgram.start_time < end_time)
-        
-        return query.order_by(EPGProgram.start_time).all()
+        # Obtenemos IDs de grabaciones para este canal de una sola vez
+        scheduled_ids = [r[0] for r in db.session.query(RecordingSchedule.program_id).all()]
+
+        programs_with_status = []
+        for p in programs:
+            # EXTRAEMOS EL ID REAL DE LA FILA DE LA BASE DE DATOS
+            real_db_id = int(p.id) 
+            
+            # Construimos el diccionario
+            prog_data = {
+                'id': real_db_id, # <--- ESTE ID NO PUEDE FALLAR
+                'start_time': p.start_time.isoformat(),
+                'end_time': p.end_time.isoformat(),
+                'title': str(p.title),
+                'description': str(p.description) if p.description else "",
+                'is_recording': real_db_id in scheduled_ids
+            }
+            programs_with_status.append(prog_data)
+                
+        return programs_with_status
     
     def get_current_program(self, epg_channel_id: int, current_time: datetime = None) -> Optional[EPGProgram]:
         """Get the current program for a channel."""
@@ -126,3 +140,32 @@ class EPGProgramRepository:
             db.session.rollback()
             logger.error(f"Error deleting program {program.id}: {str(e)}")
             return False
+            
+    def toggle_recording(self, program_id: int) -> Dict[str, Any]:
+        """
+        Activa o desactiva una grabación.
+        Retorna un diccionario con el nuevo estado.
+        """
+        try:
+            # Verificar si ya existe la grabación
+            existing = RecordingSchedule.query.filter_by(program_id=program_id).first()
+
+            if existing:
+                # Si existe, la eliminamos
+                db.session.delete(existing)
+                db.session.commit()
+                return {'status': 'removed', 'program_id': program_id}
+            else:
+                # Si no existe, la creamos
+                new_recording = RecordingSchedule(
+                    program_id=program_id,
+                    status='pending'
+                )
+                db.session.add(new_recording)
+                db.session.commit()
+                return {'status': 'scheduled', 'program_id': program_id}
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error in toggle_recording for program {program_id}: {str(e)}")
+            raise

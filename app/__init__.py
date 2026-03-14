@@ -3,9 +3,11 @@ import asyncio
 import threading
 import logging
 import fasteners
+import time
 from flask import Flask, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 from app.extensions import db, migrate
+from app.tasks.recorder import process_recordings
 
 # El task_manager se define como None y se inicializa dentro de create_app
 task_manager = None
@@ -82,9 +84,11 @@ def create_app(test_config=None):
 
     with app.app_context():
         try:
-            # Crear tablas si no existen
-            logger.info("Initializing database tables...")
-            db.create_all()
+            try:
+                logger.info("Initializing database tables...")
+                db.create_all()
+            except Exception as e:
+                logger.info("Tables already exist.")
             
             settings_repo = SettingsRepository()
             config.set_settings_repository(settings_repo)
@@ -94,22 +98,40 @@ def create_app(test_config=None):
                 task_manager.init_app(app)
 
                 def run_background_loop():
-                    # Archivo de bloqueo para evitar múltiples hilos en workers de Gunicorn
+                    from app.tasks.recorder import process_recordings # Importación local
+                    
                     lock = fasteners.InterProcessLock('/tmp/task_manager.lock')
                     got_lock = lock.acquire(blocking=False)
                     
                     if not got_lock:
-                        logger.info("[Worker] TaskManager is already active in another process. Skipping.")
+                        logger.info("[Worker] TaskManager/Recorder is already active. Skipping.")
                         return
 
-                    logger.info("[MANAGER] Lock acquired! Starting stream loop.")
+                    logger.info("[MANAGER] Lock acquired! Starting background loops.")
                     
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
+                    
+                    async def combined_tasks():
+                        # TaskManager
+                        # Si tu task_manager.start() es un bucle infinito, lo lanzamos como tarea
+                        asyncio.create_task(task_manager.start())
+                        
+                        # El Grabador
+                        while True:
+                            try:
+                                # Ejecutamos el grabador en un hilo separado para no bloquear el bucle asíncrono
+                                await loop.run_in_executor(None, process_recordings, app)
+                            except Exception as e:
+                                logger.error(f"Error in recording worker: {e}")
+                            
+                            # Esperar 60 segundos antes de la siguiente revisión
+                            await asyncio.sleep(60)
+
                     try:
-                        loop.run_until_complete(task_manager.start())
+                        loop.run_until_complete(combined_tasks())
                     except Exception as e:
-                        logger.error(f"Task Manager loop crashed: {e}")
+                        logger.error(f"Background loop crashed: {e}")
                     finally:
                         if lock.exists():
                             lock.release()

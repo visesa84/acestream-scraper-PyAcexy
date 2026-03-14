@@ -32,26 +32,34 @@ class TVChannelRepository:
         return TVChannel.query.get(id)
         
     def get_with_acestreams(self, id: int) -> Optional[Dict]:
-        """
-        Get a TV channel by ID with associated acestream data
-        
-        Args:
-            id: The TV channel ID
-            
-        Returns:
-            Dictionary with TV channel data and acestreams or None if not found
-        """
         channel = self.get_by_id(id)
-        if not channel:
-            return None
+        if not channel: return None
             
-        # Get acestreams
         acestreams = AcestreamChannel.query.filter_by(tv_channel_id=id).all()
-        
-        # Convert to dict
         result = channel.to_dict()
         result['acestream_channels'] = [stream.to_dict() for stream in acestreams]
         
+        result['programs'] = []
+        try:
+            xml_id = getattr(channel, 'epg_id', None)
+            if xml_id:
+                from app.services.epg_service import EPGService
+                from datetime import datetime
+                service = EPGService()
+                all_programs = service.get_programs_for_channel(xml_id)
+                now = datetime.now()
+                
+                # Formateamos aquí los programas
+                for p in all_programs:
+                    stop_dt = datetime.fromisoformat(p['stop'])
+                    if stop_dt > now:
+                        start_dt = datetime.fromisoformat(p['start'])
+                        # Creamos un string amigable
+                        p['time_display'] = f"{start_dt.strftime('%d/%m %H:%M')} - {stop_dt.strftime('%H:%M')}"
+                        result['programs'].append(p)
+        except Exception as e:
+            print(f"Error EPG: {e}")
+            
         return result
 
     def get_all(self, is_active: bool = None) -> List[TVChannel]:
@@ -408,6 +416,25 @@ class TVChannelRepository:
                 'message': f'Successfully updated {len(channels)} channels',
                 'updated_count': len(channels)
             }
+        except Exception as e:
+            db.session.rollback()
+            raise e
+            
+    def bulk_delete_channels(self, channel_ids: List[int]) -> int:
+        """Borra múltiples canales de una sola tacada"""
+        try:
+            # 1. Desvinculamos los acestreams para evitar errores de clave foránea
+            AcestreamChannel.query.filter(
+                AcestreamChannel.tv_channel_id.in_(channel_ids)
+            ).update({'tv_channel_id': None}, synchronize_session=False)
+            
+            # 2. Borramos los canales en una sola consulta
+            deleted_count = TVChannel.query.filter(
+                TVChannel.id.in_(channel_ids)
+            ).delete(synchronize_session=False)
+            
+            db.session.commit()
+            return deleted_count
         except Exception as e:
             db.session.rollback()
             raise e
