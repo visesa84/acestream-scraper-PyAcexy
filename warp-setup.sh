@@ -48,18 +48,25 @@ if [ "${ENABLE_WARP}" = "true" ]; then
 	# Asegurar MTU bajo
 	sed -i 's/MTU = .*/MTU = 1280/' "$WG_CONF"
 	
-	# Obtener la IP del Gateway de tu red local (eth0)
-	GATEWAY_IP=$(ip route | grep default | awk '{print $3}')
+	# ELIMINAR SIEMPRE RUTAS EXISTENTES
+    sed -i '/PostUp = .*/d' "$WG_CONF"
+    sed -i '/PostDown = .*/d' "$WG_CONF"
 
-	# Configurar PostUp para que:
-	#    a) El tráfico al servidor de Cloudflare salga por tu red real (evita el bucle)
-	#    b) El resto del mundo salga por el túnel (WARP)
-	sed -i '/PostUp = .*/d' "$WG_CONF"
-	sed -i "/\[Interface\]/a PostUp = ip route replace 162.159.192.1 via $GATEWAY_IP dev eth0 && ip route replace 0.0.0.0/0 dev wg0" "$WG_CONF"
+    # AÑADIR RUTAS SOLO SI CONTAINER_NETWORK_MODE=bridge
+    if [ "$CONTAINER_NETWORK_MODE" = "bridge" ]; then
+        echo "$(date): CONTAINER_NETWORK_MODE=bridge → Adding PostUp/PostDown routes." >> "$LOG_FILE"
 
-	# Configurar PostDown para restaurar el acceso normal al apagar
-	sed -i '/PostDown = .*/d' "$WG_CONF"
-	sed -i "/\[Interface\]/a PostDown = ip route replace 0.0.0.0/0 via $GATEWAY_IP dev eth0" "$WG_CONF"
+        GATEWAY_IP=$(ip route | grep default | awk '{print $3}')
+
+        if [ -n "$GATEWAY_IP" ]; then
+            sed -i "/\[Interface\]/a PostUp = ip route replace 162.159.192.1 via $GATEWAY_IP dev eth0 && ip route replace 0.0.0.0/0 dev wg0" "$WG_CONF"
+            sed -i "/\[Interface\]/a PostDown = ip route replace 0.0.0.0/0 via $GATEWAY_IP dev eth0" "$WG_CONF"
+        else
+            echo "$(date): WARNING: Gateway not detected. Skipping route injection." >> "$LOG_FILE"
+        fi
+    else
+        echo "$(date): CONTAINER_NETWORK_MODE != bridge → Running in safe mode (no routes)." >> "$LOG_FILE"
+    fi
 
 	# Eliminar cualquier FwMark si existiera
 	sed -i '/FwMark/d' "$WG_CONF"

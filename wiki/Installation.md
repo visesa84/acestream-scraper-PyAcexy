@@ -41,6 +41,7 @@ Docker Compose provides the easiest way to get started with Acestream Scraper.
 		 - ENABLE_ACEXY=true
 		 - ENABLE_ACESTREAM_ENGINE=true
 		 - ENABLE_WARP=false
+		 - CONTAINER_NETWORK_MODE=host
 		 - WARP_LICENSE_KEY=
 		 - ACESTREAM_HTTP_PORT=6878
 		 - ACESTREAM_HTTP_HOST=ACEXY_HOST

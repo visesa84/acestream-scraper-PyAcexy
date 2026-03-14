@@ -23,7 +23,7 @@ def process_recordings(app, single_program_id=None):
         setting_rec = Setting.query.filter_by(key='base_url').first()
         base_url = setting_rec.value if setting_rec else "http://localhost:8080/ace/getstream?id="
 
-        # DETENER GRABACIONES CANCELADAS (Reactividad al pulsar "Parar")
+        # DETENER GRABACIONES CANCELADAS
         for proc in psutil.process_iter(['name', 'cmdline']):
             try:
                 cmdline = proc.info.get('cmdline') or []
@@ -36,15 +36,15 @@ def process_recordings(app, single_program_id=None):
                         
                         exists = RecordingSchedule.query.filter_by(program_id=found_id).first()
                         
-                        if not exists or exists.status not in ['recording', 'pending']:
+                        if not exists or exists.status not in ['recording', 'pending', 'retrying']:
                             app.logger.warning(f"[RECORDER] Stopping ffmpeg process for program ID {found_id}")
                             proc.terminate()
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
-        # REVISAR ESTADO DE GRABACIONES (Terminadas, Interrumpidas o Archivo Borrado)
+        # REVISAR ESTADO DE GRABACIONES
         active_or_pending = RecordingSchedule.query.filter(
-            RecordingSchedule.status.in_(['recording', 'pending'])
+            RecordingSchedule.status.in_(['recording', 'pending', 'retrying'])
         ).all()
 
         for rec in active_or_pending:
@@ -55,9 +55,9 @@ def process_recordings(app, single_program_id=None):
             parts = [f for f in os.listdir(save_path) if f.startswith(f"{clean_title}_{prog.id}")]
             file_exists = len(parts) > 0
 
-            # Si está grabando pero el archivo ha sido borrado manualmente
+            # Si estaba grabando pero no hay archivo → iniciar ventana de reintentos
             if rec.status == 'recording' and not file_exists:
-                app.logger.warning(f"[RECORDER] File deleted manually for {prog.title}. Removing schedule and killing process.")
+                app.logger.warning(f"[RECORDER] No file for {prog.title}. Starting retry window.")
 
                 # Matar proceso ffmpeg asociado
                 for proc in psutil.process_iter(['cmdline']):
@@ -68,9 +68,37 @@ def process_recordings(app, single_program_id=None):
                     except:
                         pass
 
-                # Borrar schedule
-                db.session.delete(rec)
+                rec.status = 'retrying'
+                rec.retry_start = datetime.now()
                 db.session.commit()
+                continue
+
+            # Lógica de reintentos
+            if rec.status == 'retrying':
+                retry_window_minutes = 2      # Y minutos
+                retry_interval_seconds = 10   # X segundos
+
+                elapsed = (datetime.now() - rec.retry_start).total_seconds()
+
+                if elapsed >= retry_window_minutes * 60:
+                    app.logger.warning(f"[RECORDER] Retry window expired for {prog.title}. Marking as failed.")
+                    rec.status = 'failed'
+                    db.session.commit()
+                    continue
+
+                # Intentar reanudar si el canal vuelve online
+                tv_chan = TVChannel.query.filter_by(epg_id=prog.epg_channel.channel_xml_id).first()
+                if tv_chan:
+                    ace_chan = AcestreamChannel.query.filter_by(tv_channel_id=tv_chan.id, status='active', is_online=True).first()
+                    if ace_chan:
+                        app.logger.info(f"[RECORDER] Stream back online for {prog.title}. Restarting recording.")
+                        rec.status = 'pending'
+                        db.session.commit()
+                        continue
+
+                # Aún en ventana de reintentos
+                app.logger.info(f"[RECORDER] Retrying {prog.title}... {int(elapsed)}s elapsed.")
+                time.sleep(retry_interval_seconds)
                 continue
 
             # El programa ya terminó en la EPG
@@ -100,11 +128,12 @@ def process_recordings(app, single_program_id=None):
                         continue
                 
                 if not is_alive:
-                    app.logger.warning(f"[RECORDER] Stream lost for {prog.title}. Set to pending for retry.")
-                    rec.status = 'pending'
+                    app.logger.warning(f"[RECORDER] Stream lost for {prog.title}. Set to retrying.")
+                    rec.status = 'retrying'
+                    rec.retry_start = datetime.now()
                     db.session.commit()
 
-        # INICIAR GRABACIONES (Nuevas o Partes por reintento)
+        # INICIAR GRABACIONES
         to_start = []
         if single_program_id:
             to_start = RecordingSchedule.query.join(EPGProgram).filter(
@@ -138,7 +167,6 @@ def process_recordings(app, single_program_id=None):
             duration = int((prog.end_time - now).total_seconds())
             stream_url = f"{base_url}{ace_chan.id}"
 
-            # Comando FFMPEG con Timeouts de red y tag de identificación
             cmd_str = f'ffmpeg -y -hide_banner -loglevel error -i "{stream_url}" -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 -rw_timeout 15000000 -t {int(duration)} -c:v copy -c:a aac -movflags +faststart -user_agent "prog_id:{prog.id}" "{filename}"'
 
             try:
