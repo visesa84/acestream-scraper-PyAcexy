@@ -9,6 +9,7 @@ class RecordingSchedule(db.Model):
     status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    retry_start = db.Column(db.DateTime, nullable=True)
 
     # La relación se define aquí y crea automáticamente el campo en EPGProgram
     program = db.relationship('EPGProgram', backref=db.backref('recording_info', uselist=False))

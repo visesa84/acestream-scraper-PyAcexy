@@ -109,6 +109,7 @@ Cloudflare WARP provides enhanced privacy and secure connection options:
 | Variable | Description | Default | Notes |
 |----------|-------------|---------|-------|
 | `ENABLE_WARP` | Enable Cloudflare WARP | `false` | Requires `NET_ADMIN` and `SYS_ADMIN` capabilities |
+| `CONTAINER_NETWORK_MODE` | Mode of network container | `host` | Modes `host` and `bridge` |
 | `WARP_LICENSE_KEY` | WARP license key | - | Optional: For WARP+ or Team accounts |
 
 ### Docker Example with WARP Enabled
