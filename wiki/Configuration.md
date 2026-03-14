@@ -123,6 +123,7 @@ docker run -d \
   --sysctl net.ipv4.conf.all.src_valid_mark=1 \
   --sysctl net.ipv4.ip_forward=1 \
   -e ENABLE_WARP=true \
+  -e CONTAINER_NETWORK_MODE=bridge \
   -v "${PWD}/config:/app/config" \
   -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
@@ -146,6 +147,7 @@ services:
     environment:
       - TZ=Europe/Madrid
       - ENABLE_WARP=true
+	  - CONTAINER_NETWORK_MODE=bridge
     ports:
       - "8040:8040"
     volumes:

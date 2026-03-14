@@ -1,5 +1,6 @@
 import os
 import base64
+from datetime import datetime
 from flask import request
 from urllib.parse import urlparse, quote
 from typing import List, Dict, Optional
@@ -397,23 +398,33 @@ class PlaylistService:
             # Generate program entries - each variant of a channel needs its own program entries
             # with the correct channel ID
             for program in programs:
-                start_time_str = program.start_time.strftime("%Y%m%d%H%M%S %z")
-                stop_time_str = program.end_time.strftime("%Y%m%d%H%M%S %z")
+                # Convertir fechas (Acceso como diccionario)
+                start_dt = datetime.fromisoformat(program['start_time'])
+                start_time_str = start_dt.strftime("%Y%m%d%H%M%S %z")
                 
-                # Make sure timezone offset is included
+                end_dt = datetime.fromisoformat(program['end_time'])
+                stop_time_str = end_dt.strftime("%Y%m%d%H%M%S %z") # <--- Cambiado de end_time_str a stop_time_str
+                
+                # Asegurar zona horaria
                 if start_time_str.endswith(' '):
-                    start_time_str += '+0000'  # Add UTC offset if missing
+                    start_time_str += '+0000'
                 if stop_time_str.endswith(' '):
-                    stop_time_str += '+0000'  # Add UTC offset if missing
+                    stop_time_str += '+0000'
                 
+                # Construir XML (Cambiado a acceso de diccionario: program['clave'])
                 xml_lines.append(f'  <programme start="{start_time_str}" stop="{stop_time_str}" channel="{html.escape(epg_id)}">')
-                xml_lines.append(f'    <title>{html.escape(program.title)}</title>')
                 
-                if program.description:
-                    xml_lines.append(f'    <desc>{html.escape(program.description)}</desc>')
+                # Usar .get() para evitar errores si la clave no existe
+                title = program.get('title', 'Sin título')
+                xml_lines.append(f'    <title>{html.escape(str(title))}</title>')
                 
-                if program.category:
-                    xml_lines.append(f'    <category>{html.escape(program.category)}</category>')
+                desc = program.get('description')
+                if desc:
+                    xml_lines.append(f'    <desc>{html.escape(str(desc))}</desc>')
+                
+                cat = program.get('category')
+                if cat:
+                    xml_lines.append(f'    <category>{html.escape(str(cat))}</category>')
                 
                 xml_lines.append('  </programme>')
         
