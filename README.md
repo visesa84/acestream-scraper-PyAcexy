@@ -55,6 +55,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 		 - ENABLE_ACEXY=true
 		 - ENABLE_ACESTREAM_ENGINE=true
 		 - ENABLE_WARP=false
+		 - CONTAINER_NETWORK_MODE=host
 		 - WARP_LICENSE_KEY=
 		 - ACESTREAM_HTTP_PORT=6878
 		 - ACESTREAM_HTTP_HOST=ACEXY_HOST
@@ -218,6 +219,7 @@ docker run -d \
   --sysctl net.ipv4.conf.all.src_valid_mark=1 \
   --sysctl net.ipv4.ip_forward=1 \
   -e ENABLE_WARP=true \
+  -e CONTAINER_NETWORK_MODE=bridge \
   -v "${PWD}/config:/app/config" \
   -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
@@ -358,6 +360,7 @@ PyAcexy provides an enhanced proxy interface for Acestream, with a web UI for be
 Cloudflare WARP provides enhanced privacy and secure tunneling:
 
 - `ENABLE_WARP`: Set to `true` to enable Cloudflare WARP (default: `false`)
+- `CONTAINER_NETWORK_MODE`: Set to `host` or `bridge` (default: `host`)
 - `WARP_LICENSE_KEY`: Optional license key for WARP+ or WARP Team
 
 #### Other Settings
