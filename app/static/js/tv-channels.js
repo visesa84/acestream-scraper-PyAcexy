@@ -638,32 +638,33 @@ function openBulkEditModal() {
         return;
     }
     
-    // Get the modal element
-    const modal = document.getElementById('bulkEditModal');
-    if (!modal) return;
-    
-    // Reset the form
-    const form = document.getElementById('bulkEditForm');
-    if (form) {
-        form.reset();
+    // ID CORREGIDO: bulkEditTVChannelsModal
+    const modal = document.getElementById('bulkEditTVChannelsModal');
+    if (!modal) {
+        console.error("No se encontró el modal bulkEditTVChannelsModal");
+        return;
     }
     
-    // Reset all field toggles to unchecked and hide field groups
+    // ID CORREGIDO: bulkEditTVChannelsForm
+    const form = document.getElementById('bulkEditTVChannelsForm');
+    if (form) form.reset();
+    
+    // Reiniciar los toggles y ocultar los campos (usando tus clases bulk-field-toggle y bulk-field)
     document.querySelectorAll('.bulk-field-toggle').forEach(toggle => {
         toggle.checked = false;
     });
     
-    document.querySelectorAll('.bulk-field-group').forEach(group => {
+    document.querySelectorAll('.bulk-field').forEach(group => {
         group.classList.add('d-none');
     });
     
-    // Update the selection count in the modal
-    const selectionCountElement = document.getElementById('selectedChannelCount');
+    // ID CORREGIDO: bulkEditCount (donde sale el número en tu HTML)
+    const selectionCountElement = document.getElementById('bulkEditCount');
     if (selectionCountElement) {
         selectionCountElement.textContent = selectedCount;
     }
     
-    // Show the modal
+    // Mostrar el modal
     const bsModal = new bootstrap.Modal(modal);
     bsModal.show();
 }
@@ -716,35 +717,34 @@ function updateBulkEditToolbar() {
  * Save bulk edit changes to selected TV channels
  */
 function saveBulkEdit() {
-    // Get selected channel IDs
+    // 1. Obtener IDs seleccionados
     const selectedIds = Array.from(tvChannelsState.selectedChannels);
     if (selectedIds.length === 0) return;
     
-    // Collect form data
-    const form = document.getElementById('bulkEditForm');
+    // 2. CORRECCIÓN ID: Tu formulario se llama 'bulkEditTVChannelsForm'
+    const form = document.getElementById('bulkEditTVChannelsForm');
     if (!form) return;
     
     const changes = {};
     let hasChanges = false;
     
-    // Check which fields are enabled and collect their values
+    // 3. Recorrer toggles marcados
     document.querySelectorAll('.bulk-field-toggle:checked').forEach(toggle => {
-        const fieldName = toggle.value;
+        const fieldName = toggle.value; // 'category', 'country', 'language', 'is_active'
         let fieldValue;
         
-        // Handle different types of fields
-        switch (fieldName) {
-            case 'is_active':
-                fieldValue = form.querySelector(`[name="${fieldName}"]`).checked;
-                break;
-            default:
-                const input = form.querySelector(`[name="${fieldName}"]`);
-                if (input) {
-                    fieldValue = input.value.trim() || null;
-                }
+        // 4. Lógica de captura según el ID de tus inputs
+        if (fieldName === 'is_active') {
+            fieldValue = document.getElementById('bulkEditIsActive').checked;
+        } else {
+            // Buscamos por ID (bulkEditCategory, bulkEditCountry, bulkEditLanguage)
+            const inputId = 'bulkEdit' + fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
+            const input = document.getElementById(inputId);
+            if (input) {
+                fieldValue = input.value.trim();
+            }
         }
         
-        // Add to changes if value is not undefined
         if (fieldValue !== undefined) {
             changes[fieldName] = fieldValue;
             hasChanges = true;
@@ -756,47 +756,35 @@ function saveBulkEdit() {
         return;
     }
     
-    // Show loading
     showLoading();
     
-    // Send API request
+    // 5. Envío a la API (Asegúrate de que el backend espere 'changes' o 'update_data')
     fetch('/api/tv-channels/bulk-update', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             channel_ids: selectedIds,
-            changes: changes
+            update_data: changes // Cambiado a update_data para coincidir con el Repository
         })
     })
     .then(response => {
-        if (!response.ok) {
-            return response.json().then(data => {
-                throw new Error(data.message || 'Failed to update TV channels');
-            });
-        }
+        if (!response.ok) throw new Error('Failed to update TV channels');
         return response.json();
     })
     .then(data => {
-        // Show success message
         showAlert('success', `Successfully updated ${data.updated_count} channels`);
         
-        // Close modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('bulkEditModal'));
-        if (modal) {
-            modal.hide();
-        }
+        // 6. CORRECCIÓN ID: Cerrar 'bulkEditTVChannelsModal'
+        const modalElement = document.getElementById('bulkEditTVChannelsModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) modal.hide();
         
-        // Refresh channel list to reflect changes
-        loadTVChannels();
-        
-        // Clear selection
-        clearSelection();
+        loadTVChannels(); // Refrescar lista
+        clearSelection(); // Limpiar checkboxes
     })
     .catch(error => {
-        console.error('Error during bulk update:', error);
-        showAlert('error', error.message || 'Failed to update TV channels');
+        console.error('Error:', error);
+        showAlert('error', error.message);
     })
     .finally(() => {
         hideLoading();
@@ -1913,3 +1901,19 @@ function toggleChannelFavorite(channelId) {
         hideLoading();
     });
 }
+
+// Delegación de eventos para los toggles de la modal
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('bulk-field-toggle')) {
+        const fieldName = e.target.value; // 'category', 'country', etc.
+        const fieldGroup = document.getElementById(fieldName + 'FieldGroup');
+        
+        if (fieldGroup) {
+            if (e.target.checked) {
+                fieldGroup.classList.remove('d-none');
+            } else {
+                fieldGroup.classList.add('d-none');
+            }
+        }
+    }
+});

@@ -87,6 +87,7 @@ docker run -d \
   --sysctl net.ipv4.ip_forward=1 \
   -e ENABLE_WARP=true \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
 ```

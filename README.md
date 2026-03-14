@@ -26,6 +26,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 - **API documentation via OpenAPI/Swagger UI**
 - **Enhanced health checking for all components**
 - **Enable or disable Stream**
+- **Record funcionality in TV Channels UI**
 
 ## Quick Start
 
@@ -76,6 +77,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
        volumes:
          - ./data/zeronet:/app/ZeroNet/data
          - ./data/config:/app/config
+		 - ./data/recordings:/app/config/recordings
        healthcheck:
          test: ["CMD", "/app/healthcheck.sh"]
          interval: 30s
@@ -103,6 +105,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
    docker run -d \
      -p 8040:8040 \
      -v "${PWD}/config:/app/config" \
+	 -v "${PWD}/recordings:/app/config/recordings" \
      --name acestream-scraper \
      visesa84/acestream-scraper-pyacexy:latest
    ```
@@ -143,8 +146,8 @@ docker run -d \
   -p 8080:8080 \
   -e ENABLE_ACEXY=true \
   -e ENABLE_ACESTREAM_ENGINE=true \
-  -e ALLOW_REMOTE_ACCESS=yes \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
 ```
@@ -164,6 +167,7 @@ docker run -d \
   -e ACEXY_HOST=192.168.1.100 \
   -e ACEXY_PORT=6878 \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
 ```
@@ -180,6 +184,7 @@ docker run -d \
   -p 43110:43110 \
   -p 43111:43111 \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   -v "${PWD}/zeronet_data:/app/ZeroNet/data" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
@@ -194,6 +199,7 @@ docker run -d \
   -p 43111:43111 \
   -e ENABLE_TOR=true \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   -v "${PWD}/zeronet_data:/app/ZeroNet/data" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
@@ -213,6 +219,7 @@ docker run -d \
   --sysctl net.ipv4.ip_forward=1 \
   -e ENABLE_WARP=true \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
 
@@ -386,6 +393,7 @@ To use this feature:
 When using Docker, mount these volumes:
 
 - `/app/config`: Configuration files
+- `/app/recordings`: Records files
 - `/app/ZeroNet/data`: ZeroNet data directory (if using ZeroNet)
 
 ### ZeroNet Configuration
@@ -422,6 +430,7 @@ docker run -d \
   -p 8040:8040 \
   -p 43110:43110 \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
 ```

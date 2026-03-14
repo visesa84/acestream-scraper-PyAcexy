@@ -102,3 +102,7 @@ def epg_management():
     if not config.settings_repo or not config.settings_repo.is_setup_completed():
         return redirect(url_for('main.setup'))
     return render_template('epg.html')
+    
+@bp.route('/recordings')
+def recordings_page():
+    return render_template('recordings.html')

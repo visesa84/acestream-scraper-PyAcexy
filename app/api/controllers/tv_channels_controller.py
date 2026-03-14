@@ -196,23 +196,16 @@ class TVChannelsList(Resource):
 @api.param('id', 'The TV channel ID')
 class TVChannelResource(Resource):
     @api.doc('get_tv_channel')
-    @api.response(200, 'Success')
-    @api.response(404, 'TV Channel not found')
     def get(self, id):
-        """Get a TV channel by ID"""
+        """Get a TV channel by ID with its EPG"""
         repo = TVChannelRepository()
-        channel = repo.get_by_id(id)
         
-        if not channel:
+        channel_data = repo.get_with_acestreams(id)
+        
+        if not channel_data:
             api.abort(404, f'TV Channel {id} not found')
             
-        # Get associated acestream channels
-        acestreams = AcestreamChannel.query.filter_by(tv_channel_id=id).all()
-        
-        result = channel.to_dict()
-        result['acestream_channels'] = [stream.to_dict() for stream in acestreams]
-        
-        return result
+        return channel_data
     
     @api.doc('update_tv_channel')
     @api.expect(tv_channel_update_model)
@@ -472,16 +465,9 @@ class BulkDeleteResource(Resource):
             api.abort(400, "No channel IDs provided")
             
         try:
-            # Create repository instance
             repo = TVChannelRepository()
-            
-            # Track successful deletions
-            deleted_count = 0
-            
-            # Delete each channel
-            for channel_id in channel_ids:
-                if repo.delete(channel_id):
-                    deleted_count += 1
+            # Llamada única al repositorio
+            deleted_count = repo.bulk_delete_channels(channel_ids)
             
             return {
                 'message': f'Successfully deleted {deleted_count} channels',

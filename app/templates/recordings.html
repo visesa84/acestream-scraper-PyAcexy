@@ -1,0 +1,232 @@
+{% extends "layout.html" %}
+{% block recordings_active %}active{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Cabecera -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0"><i class="bi bi-record-circle text-danger"></i> Recordings Management</h2>
+        </div>
+        <button class="btn btn-primary shadow-sm" onclick="loadRecordings()">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+    </div>
+
+    <!-- Tabla principal -->
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 40%">Program / Filename</th>
+                        <th style="width: 15%">Status</th>
+                        <th style="width: 10%">Size</th>
+                        <th style="width: 15%">Date</th>
+                        <th style="width: 20%" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="recordingsTable">
+                    <tr>
+                        <td colspan="5" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2 text-muted">Scanning for files...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DEL REPRODUCTOR NATIVO MP4 -->
+<div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark border-0">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title text-white" id="videoTitle">Playing Recording</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="stopVideo()"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="ratio ratio-16x9 bg-black rounded overflow-hidden">
+                    <!-- USAMOS LA ETIQUETA VIDEO ESTÁNDAR -->
+                    <video id="videoPlayer" controls class="w-100 h-100">
+                        Tu navegador no soporta la reproducción de video MP4.
+                    </video>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Estilos para el estado Recording */
+    .pulse-red {
+        background-color: #dc3545 !important;
+        animation: pulse-animation 2s infinite;
+        border: none;
+    }
+    @keyframes pulse-animation {
+        0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+    }
+</style>
+<script>
+/**
+ * Carga y renderiza la lista de archivos
+ */
+function loadRecordings() {
+    fetch('/api/recordings/list')
+        .then(res => res.json())
+        .then(data => {
+            const tbody = document.getElementById('recordingsTable');
+            
+            const files = Array.isArray(data) ? data : (data.items || data.files || []);
+
+            if (files.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">No recordings found.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = files.map(file => {
+
+                const hasFile = file.filename && file.filename.trim() !== "";
+
+                const displayName = hasFile
+                    ? file.filename
+                    : `<span class="text-muted">${file.title}</span>`;
+
+                let statusBadge = '';
+                switch(file.status) {
+                    case 'completed': statusBadge = '<span class="badge bg-success">COMPLETED</span>'; break;
+                    case 'recording': statusBadge = '<span class="badge pulse-red text-white">RECORDING</span>'; break;
+                    case 'failed': statusBadge = '<span class="badge bg-warning text-dark">FAILED</span>'; break;
+                    case 'pending': statusBadge = '<span class="badge bg-info text-dark">PENDING</span>'; break;
+                    default: statusBadge = '';
+                }
+
+                let actionButtons = "";
+
+                // NO hay archivo → solo borrar schedule
+                if (!hasFile) {
+                    actionButtons = `
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteRecording(${file.program_id}, null)">
+                            <i class="bi bi-trash"></i>
+                        </button>`;
+                }
+                // Está grabando → solo borrar archivo
+                else if (file.status === 'recording') {
+                    actionButtons = `
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteRecording(${file.program_id}, '${file.filename}')">
+                            <i class="bi bi-trash"></i>
+                        </button>`;
+                }
+                // Hay archivo y NO está grabando → Play + Download + Borrar
+                else {
+                    actionButtons = `
+                        <button class="btn btn-sm btn-primary" onclick="playVideo('${file.filename}', '${file.status}')">
+                            <i class="bi bi-play-fill"></i> Play
+                        </button>
+                        <a href="/api/recordings/download/${file.filename}" class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-download"></i>
+                        </a>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteRecording(${file.program_id}, '${file.filename}')">
+                            <i class="bi bi-trash"></i>
+                        </button>`;
+                }
+
+                return `
+                <tr>
+                    <td>
+                        <div class="fw-bold text-truncate" style="max-width: 350px;">${displayName}</div>
+                        <small class="text-muted">Prog ID: ${file.program_id || 'N/A'}</small>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td><span class="badge border text-dark bg-light">${file.size_display}</span></td>
+                    <td class="text-muted small">${new Date(file.date).toLocaleString()}</td>
+                    <td class="text-end">
+                        <div class="btn-group shadow-sm">
+                            ${actionButtons}
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        })
+        .catch(err => console.error("Load error:", err));
+}
+
+/**
+ * Lógica del reproductor modal
+ */
+function playVideo(filename, status) {
+    const video = document.getElementById('videoPlayer');
+    const modalElement = document.getElementById('videoModal');
+    const modal = new bootstrap.Modal(modalElement);
+    
+    video.src = `/api/recordings/stream/${filename}`;
+    
+    if (status === 'recording') {
+        // Si el vídeo se detiene porque llegó al final de lo que había descargado
+        video.onended = function() {
+            // Esperamos un segundo a que haya más datos en el disco
+            setTimeout(() => {
+                const current = video.currentTime;
+                video.load(); // Recarga el recurso para ver el nuevo tamaño
+                video.currentTime = current; // Vuelve a donde estaba
+                video.play();
+            }, 1000);
+        };
+    } else {
+        video.onended = null;
+    }
+
+    modal.show();
+    video.play();
+}
+
+function stopVideo() {
+    const video = document.getElementById('videoPlayer');
+    video.pause();
+    video.src = "";
+}
+
+// Asegurar que el video se detiene si se cierra el modal con ESC
+document.getElementById('videoModal').addEventListener('hidden.bs.modal', stopVideo);
+
+/**
+ * Borrado
+ */
+function deleteRecording(programId, filename) {
+
+    // Si hay archivo → borrar archivo
+    if (filename) {
+        if (!confirm(`Delete file ${filename}?`)) return;
+
+        fetch(`/api/recordings/delete/${filename}`, { method: 'DELETE' })
+            .then(() => loadRecordings())
+            .catch(err => console.error("Delete file error:", err));
+
+        return;
+    }
+
+    // Si NO hay archivo → borrar schedule
+    if (!confirm(`Delete scheduled recording for program ${programId}?`)) return;
+
+    fetch(`/api/recordings/schedule/${programId}`, { method: 'DELETE' })
+        .then(() => loadRecordings())
+        .catch(err => console.error("Delete schedule error:", err));
+}
+
+// Limpiar vídeo al cerrar el modal (tecla ESC o click fuera)
+document.getElementById('videoModal').addEventListener('hidden.bs.modal', stopVideo);
+
+// Carga inicial
+document.addEventListener('DOMContentLoaded', loadRecordings);
+
+// Auto-refresh si hay algo grabando
+setInterval(() => {
+    if (document.querySelector('.pulse-red')) loadRecordings();
+}, 30000);
+</script>
+{% endblock %}

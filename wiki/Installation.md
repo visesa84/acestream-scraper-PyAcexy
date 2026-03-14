@@ -63,6 +63,7 @@ Docker Compose provides the easiest way to get started with Acestream Scraper.
        volumes:
          - ./data/zeronet:/app/ZeroNet/data
          - ./data/config:/app/config
+		 - ./data/recordings:/app/config/recordings
        healthcheck:
          test: ["CMD", "/app/healthcheck.sh"]
          interval: 30s
@@ -94,6 +95,7 @@ docker pull visesa84/acestream-scraper-pyacexy:latest
 docker run -d \
   -p 8040:8040 \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
 ```
@@ -107,6 +109,7 @@ docker run -d \
   -e ENABLE_ACEXY=true \
   -e ENABLE_ACESTREAM_ENGINE=true \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
 ```
@@ -122,6 +125,7 @@ docker run -d \
   -e ACEXY_HOST=192.168.1.100 \
   -e ACEXY_PORT=6878 \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
 ```
@@ -134,6 +138,7 @@ docker run -d \
   -p 43110:43110 \
   -p 43111:43111 \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   -v "${PWD}/zeronet_data:/app/ZeroNet/data" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
@@ -148,6 +153,7 @@ docker run -d \
   -p 43111:43111 \
   -e ENABLE_TOR=true \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   -v "${PWD}/zeronet_data:/app/ZeroNet/data" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest

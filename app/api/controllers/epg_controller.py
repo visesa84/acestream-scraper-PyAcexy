@@ -364,14 +364,31 @@ class EPGChannelResource(Resource):
         }
         
 @api.route('/schedule/<string:id>')
-@api.param('id', 'El ID XML del canal')
+@api.param('id', 'The XML ID of the channel')
 class EPGScheduleResource(Resource):
     def get(self, id):
-        """Obtiene la programación para un canal específico"""
+        """Obtiene la programación futura para un canal específico"""
         try:
+            from datetime import datetime
             service = EPGService()
             programs = service.get_programs_for_channel(id)
-            return jsonify(programs)
+            
+            now = datetime.now()
+            filtered_programs = []
+
+            for p in programs:
+                try:
+                    start_dt = datetime.fromisoformat(p['start'])
+                    stop_dt = datetime.fromisoformat(p['stop'])
+                    
+                    # FILTRO: Solo si el programa termina después de ahora
+                    if stop_dt > now:
+                        p['time_display'] = f"{start_dt.strftime('%d/%m %H:%M')} - {stop_dt.strftime('%H:%M')}"
+                        filtered_programs.append(p)
+                except (ValueError, TypeError):
+                    filtered_programs.append(p)
+
+            return jsonify(filtered_programs)
         except Exception as e:
-            logger.error(f"Error al obtener agenda para {id}: {str(e)}")
-            api.abort(500, f"Error interno: {str(e)}")
+            logger.error(f"Error getting agenda for {id}: {str(e)}")
+            api.abort(500, f"Error: {str(e)}")

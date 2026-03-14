@@ -935,90 +935,77 @@ function searchEpgChannels() {
  * Show program schedule for a selected EPG channel
  */
 function showProgramSchedule(channelId) {
-    // Find the channel
     const channel = epgState.epgChannels.find(c => c.id === channelId);
     if (!channel) return;
     
-    // Store selected channel
     epgState.selectedEpgChannel = channel;
     
-    // Update UI
     const container = document.getElementById('programScheduleContainer');
-    const channelName = document.getElementById('selectedChannelName');
+    const channelNameHeader = document.getElementById('selectedChannelName');
     const scheduleTable = document.getElementById('programScheduleTable');
     
-    if (!container || !channelName || !scheduleTable) return;
+    if (!container || !channelNameHeader || !scheduleTable) return;
     
-    // Show container
     container.classList.remove('d-none');
     
-    // Set channel name
-    channelName.innerHTML = `
-        <div class="d-flex align-items-center">
-            ${channel.logo ? `<img src="${channel.logo}" class="me-2" style="max-height: 40px;">` : ''}
-            <span>${channel.name} <small class="text-muted">(${channel.id})</small></span>
+    channelNameHeader.innerHTML = `
+        <div class="d-flex align-items-center mb-3">
+            ${channel.logo ? `<img src="${channel.logo}" class="me-2 rounded border" style="max-height: 40px;">` : ''}
+            <h5 class="mb-0">${channel.name} <small class="text-muted text-uppercase fs-6">(${channel.id})</small></h5>
         </div>
     `;
     
-    // Show loading
     scheduleTable.innerHTML = `
         <tr>
-            <td colspan="3" class="text-center">
-                <div class="spinner-border spinner-border-sm" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
+            <td colspan="3" class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
                 <span class="ms-2">Loading program schedule...</span>
             </td>
         </tr>
     `;
     
-    // Fetch program schedule
     fetch(`/api/epg/schedule/${encodeURIComponent(channel.id)}`)
         .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to load program schedule');
-            }
+            if (!response.ok) throw new Error('Failed to load program schedule');
             return response.json();
         })
-        .then(programs => {
-            if (!programs || programs.length === 0) {
-                scheduleTable.innerHTML = `
-                    <tr>
-                        <td colspan="3" class="text-center">
-                            <div class="alert alert-info m-0 p-2">
-                                No program data available for this channel
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                .then(programs => {
+            const scheduleTable = document.getElementById('programScheduleTable');
+            const now = new Date();
+
+            // Filtrar programas pasados (doble seguridad en el cliente)
+            const futurePrograms = programs.filter(p => new Date(p.stop.replace(' ', 'T')) > now);
+
+            if (!futurePrograms || futurePrograms.length === 0) {
+                scheduleTable.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">No future programs available</td></tr>';
                 return;
             }
             
-            // Format and display programs
-            scheduleTable.innerHTML = programs.map(program => {
-                const startTime = new Date(program.start).toLocaleTimeString();
-                const endTime = new Date(program.stop).toLocaleTimeString();
+            scheduleTable.innerHTML = futurePrograms.map(program => {
+                const start = new Date(program.start.replace(' ', 'T'));
+                const stop = new Date(program.stop.replace(' ', 'T'));
+                const isLive = now >= start && now <= stop;
+
+                // Usamos el campo time_display de Python o calculamos uno rápido
+                const timeText = program.time_display || `${start.toLocaleDateString([], {day:'2-digit', month:'2-digit'})} ${start.getHours()}:${start.getMinutes()}`;
                 
                 return `
-                    <tr>
-                        <td>${startTime} - ${endTime}</td>
-                        <td>${program.title}</td>
-                        <td>${program.desc || ''}</td>
+                    <tr class="${isLive ? 'table-primary fw-bold' : ''}">
+                        <td class="text-nowrap">
+                            ${timeText}
+                            ${isLive ? '<br><span class="badge bg-danger mt-1 small">LIVE</span>' : ''}
+                        </td>
+                        <td class="align-middle">${program.title}</td>
+                        <td class="small text-muted align-middle">
+                            ${program.desc && program.desc !== 'null' ? program.desc : ''}
+                        </td>
                     </tr>
                 `;
             }).join('');
         })
         .catch(error => {
             console.error('Error loading program schedule:', error);
-            scheduleTable.innerHTML = `
-                <tr>
-                    <td colspan="3" class="text-center">
-                        <div class="alert alert-danger m-0 p-2">
-                            Error loading program schedule: ${error.message}
-                        </div>
-                    </td>
-                </tr>
-            `;
+            scheduleTable.innerHTML = `<tr><td colspan="3" class="text-center text-danger py-4">Error: ${error.message}</td></tr>`;
         });
 }
 

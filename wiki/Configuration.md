@@ -123,6 +123,7 @@ docker run -d \
   --sysctl net.ipv4.ip_forward=1 \
   -e ENABLE_WARP=true \
   -v "${PWD}/config:/app/config" \
+  -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest
 ```
@@ -148,6 +149,7 @@ services:
       - "8040:8040"
     volumes:
       - ./data/config:/app/config
+	  - ./data/recordings:/app/config/recordings
     restart: unless-stopped
 ```
 
@@ -186,11 +188,12 @@ When using Docker, mount these volumes:
 | Container Path | Purpose | Notes |
 |----------------|---------|-------|
 | `/app/config` | Configuration files | Contains config.json and database |
+| `/app/recordings` | Records files | Contains records assings from TV Channels EPG section |
 | `/app/ZeroNet/data` | ZeroNet data directory | Only required if using ZeroNet |
 
 Example mount:
 ```bash
-docker run -v "${PWD}/config:/app/config" -v "${PWD}/zeronet_data:/app/ZeroNet/data" ...
+docker run -v "${PWD}/config:/app/config" -v "${PWD}/recordings:/app/config/recordings" -v "${PWD}/zeronet_data:/app/ZeroNet/data" ...
 ```
 
 ## ZeroNet Configuration

@@ -1132,22 +1132,23 @@ class EPGService:
         
     def get_programs_for_channel(self, channel_xml_id: str) -> List[Dict]:
         """Obtiene los programas de la base de datos para un ID de canal XML."""
-        # Buscar canales que coincidan con el ID XML
         channels = self.epg_channel_repo.get_by_channel_xml_id(channel_xml_id)
         if not channels:
-            logger.warning(f"No se encontró el canal con ID XML: {channel_xml_id}")
+            logger.warning(f"The channel with XML ID: {channel_xml_id} was not found")
             return []
-        
-        # Usamos el ID interno del primer canal encontrado
+
         internal_id = channels[0].id
         
-        # Obtener programas usando el repositorio existente
+        # El repositorio ahora devuelve una lista de DICTIONARIES
         programs = self.epg_program_repo.get_programs_for_channel(internal_id)
         
-        # Formatear para el frontend (coincidiendo con epg.js)
+        # Formateamos para el frontend usando corchetes ['key']
         return [{
-            'start': p.start_time.isoformat() if p.start_time else None,
-            'stop': p.end_time.isoformat() if p.end_time else None,
-            'title': p.title,
-            'desc': p.description
+            'id': p['id'],                    # ID real de la DB para el botón de grabar
+            'start': p['start_time'],         # Ya es string ISO por el to_dict()
+            'stop': p['end_time'],            # Ya es string ISO por el to_dict()
+            'title': p['title'],
+            'desc': p['description'],
+            'is_recording': p['is_recording'], # Estado persistente del botón
+            'time_display': f"{p['start_time'][11:16]} - {p['end_time'][11:16]}" # "HH:MM - HH:MM"
         } for p in programs]

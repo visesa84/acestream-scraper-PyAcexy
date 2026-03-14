@@ -146,8 +146,8 @@ We don't store any personally identifiable information or full URLs.
 ## How to Submit
 
 You can submit this information:
-- As a GitHub issue (preferred): https://github.com/Pipepito/acestream-scraper/issues
-- Through a GitHub discussion: https://github.com/Pipepito/acestream-scraper/discussions
+- As a GitHub issue (preferred): https://github.com/visesa84/acestream-scraper-PyAcexy/issues
+- Through a GitHub discussion: https://github.com/visesa84/acestream-scraper-PyAcexy/discussions
 
 When submitting, please use the title format: "Scraper Data: [Site Pattern]" (without naming the specific site).
 

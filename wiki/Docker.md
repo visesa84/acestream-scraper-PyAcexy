@@ -105,13 +105,14 @@ docker-compose up -d
 Acestream Scraper uses Docker volumes to persist data:
 
 - `/app/config`: Configuration files including database
+- `/app/recordings`: Records files
 - `/app/ZeroNet/data`: ZeroNet data directory (if using ZeroNet)
 
 These volumes should be mounted to local directories to ensure your data persists when containers are updated or replaced.
 
 Example:
 ```bash
-docker run -d -p 8040:8040 -v "${PWD}/config:/app/config" visesa84/acestream-scraper-pyacexy:latest
+docker run -d -p 8040:8040 -v "${PWD}/config:/app/config" -v "${PWD}/recordings:/app/config/recordings" visesa84/acestream-scraper-pyacexy:latest
 ```
 
 This mounts your local `./config` directory to the container's `/app/config` directory.
