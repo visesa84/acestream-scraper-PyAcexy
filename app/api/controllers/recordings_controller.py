@@ -62,93 +62,100 @@ class RecordingToggle(Resource):
         except Exception as e:
             api.abort(500, f"Error processing the recording: {str(e)}")
 
+@api.route('/update_times/<int:program_id>')
+class UpdateRecordingTimes(Resource):
+    def post(self, program_id):
+        """Actualiza los horarios de una grabación buscando por program_id."""
+        data = request.json
+        
+        rec = RecordingSchedule.query.filter_by(program_id=program_id).first()
+        
+        if not rec:
+            return {"message": f"The recording with program_id {program_id} was not found"}, 404
+        
+        try:
+            # Solo permitimos cambiar el inicio si aún es 'pending'
+            if rec.status == 'pending' and 'start_time' in data:
+                # Convertimos el string ISO (YYYY-MM-DDTHH:mm) a objeto datetime
+                rec.start_time = datetime.fromisoformat(data['start_time'])
+            
+            # El fin se puede cambiar en 'pending' o 'recording'
+            if rec.status in ['pending', 'recording'] and 'end_time' in data:
+                rec.end_time = datetime.fromisoformat(data['end_time'])
+                
+            db.session.commit()
+            return {"message": "Schedules updated correctly", "program_id": program_id}, 200
+
+        except Exception as e:
+            db.session.rollback()
+            return {"error": str(e)}, 500
+
 @api.route('/list')
 class RecordingList(Resource):
     def get(self):
-        """Lista grabaciones combinando archivos y schedules."""
         items = []
         valid_states = {'completed', 'recording', 'failed', 'pending'}
-
-        # 1) Cargar todos los schedules
         schedules = RecordingSchedule.query.all()
         schedules_map = {s.program_id: s for s in schedules}
-
-        # 2) Cargar archivos físicos
         files_in_disk = os.listdir(RECORDINGS_DIR)
 
-        # 3) Procesar archivos físicos
+        # 1) Procesar archivos físicos
         for filename in files_in_disk:
-            if not filename.lower().endswith('.mp4'):
-                continue
-
-            file_path = os.path.join(RECORDINGS_DIR, filename)
-            stat = os.stat(file_path)
-            size_display = f"{stat.st_size / (1024*1024):.2f} MB"
-            file_date = datetime.fromtimestamp(stat.st_mtime).isoformat()
-
-            # Extraer program_id desde el nombre del archivo
-            match = re.search(r"_(\d+)(?:_part\d+)?\.mp4$", filename)
+            if not filename.lower().endswith('.mp4'): continue
+            
+            match = re.search(r"_(\d+)(?:_part(\d+))?\.mp4$", filename)
             program_id = int(match.group(1)) if match else None
-
+            part_num = int(match.group(2)) if match and match.group(2) else 0
+            
             rec = schedules_map.get(program_id)
+            
+            # PRIORIDAD DE FECHAS: Schedule modificado > EPG Original
+            d_start = rec.start_time.isoformat() if (rec and rec.start_time) else (rec.program.start_time.isoformat() if rec else None)
+            d_end = rec.end_time.isoformat() if (rec and rec.end_time) else (rec.program.end_time.isoformat() if rec else None)
 
-            # Estado normalizado
-            status = rec.status if rec and rec.status in valid_states else ''
-
-            # Título del programa (si existe schedule)
-            title = rec.program.title if rec else filename
+            # Lógica de estado de parte activa
+            actual_status = 'completed'
+            if rec and rec.status == 'recording':
+                has_newer = any(f"_{program_id}_part{part_num + 1}.mp4" in f for f in files_in_disk)
+                if not has_newer:
+                    actual_status = 'recording'
 
             items.append({
                 'filename': filename,
                 'program_id': program_id,
-                'title': title,
-                'size_display': size_display,
-                'date': file_date,
-                'status': status
+                'part': part_num,
+                'title': rec.program.title if rec else filename,
+                'size_display': f"{os.stat(os.path.join(RECORDINGS_DIR, filename)).st_size / (1024*1024):.2f} MB",
+                'date_start': d_start,
+                'date_end': d_end,
+                'status': actual_status
             })
 
-        # 4) Añadir schedules sin archivo (pendientes o futuros)
+        # 2) Añadir schedules sin archivo
         for rec in schedules:
             if rec.program_id not in [i['program_id'] for i in items]:
+                d_start = rec.start_time.isoformat() if rec.start_time else rec.program.start_time.isoformat()
+                d_end = rec.end_time.isoformat() if rec.end_time else rec.program.end_time.isoformat()
+                
                 items.append({
                     'filename': '',
                     'program_id': rec.program_id,
+                    'part': 0,
                     'title': rec.program.title,
                     'size_display': '0 MB',
-                    'date': rec.program.start_time.isoformat(),
-                    'status': rec.status if rec.status in valid_states else ''
+                    'date_start': d_start,
+                    'date_end': d_end,
+                    'status': rec.status if rec.status in valid_states else 'pending'
                 })
-
         return items, 200
 
-@api.route('/delete/<string:filename>')
-class RecordingDelete(Resource):
-    def delete(self, filename):
-        """Borra un archivo físico y elimina su schedule si corresponde."""
-        
-        # Validar archivo
-        file_path = os.path.join(RECORDINGS_DIR, filename)
-        if not os.path.exists(file_path):
-            api.abort(404, "File not found")
-
-        # Extraer program_id desde el nombre del archivo
-        match = re.search(r"_(\d+)(?:_part\d+)?\.mp4$", filename)
-        program_id = int(match.group(1)) if match else None
-
-        # Borrar archivo físico
-        os.remove(file_path)
-
-        # Si no hay program_id, solo borramos archivo
-        if not program_id:
-            return {'message': 'File deleted (no schedule associated)'}, 200
-
-        # Buscar schedule asociado
+@api.route('/stop/<int:program_id>')
+class RecordingStop(Resource):
+    def post(self, program_id):
+        """Detiene una grabación en curso buscando el proceso por el tag de prog_id."""
         rec = RecordingSchedule.query.filter_by(program_id=program_id).first()
-        if not rec:
-            return {'message': 'File deleted (schedule not found)'}, 200
-
-        # Si estaba grabando, matar proceso ffmpeg
-        if rec.status == "recording":
+        
+        if rec and rec.status == 'recording':
             for proc in psutil.process_iter(['cmdline']):
                 try:
                     cmdline = " ".join(proc.info.get('cmdline') or [])
@@ -157,14 +164,25 @@ class RecordingDelete(Resource):
                 except:
                     pass
 
-        # Borrar schedule de la base de datos
-        db.session.delete(rec)
-        db.session.commit()
+            # Actualizar base de datos
+            rec.status = 'completed'
+            db.session.commit()
+            
+            return {
+                'message': 'Stopped successfully', 
+                'program_id': program_id
+            }, 200
+            
+        return {'message': 'Recording not found or not in progress'}, 404
 
-        return {
-            'message': 'File and schedule deleted',
-            'program_id': program_id
-        }, 200
+@api.route('/delete/<string:filename>')
+class RecordingDelete(Resource):
+    def delete(self, filename):
+        file_path = os.path.join(RECORDINGS_DIR, filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            return {"message": "File deleted"}, 200
+        api.abort(404, "File not found")
         
 @api.route('/schedule/<int:program_id>')
 class DeleteSchedule(Resource):
