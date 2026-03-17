@@ -114,6 +114,42 @@ class EPGXmlGuide(Resource):
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
 
+@api.route('/m3u/epg')
+class PlaylistWithEPG(Resource):
+    @api.doc('get_playlist_with_epg_link')
+    @api.expect(playlist_parser)
+    def get(self):
+        args = playlist_parser.parse_args()
+        search = args.get('search')
+        favorites = args.get('favorites_only', False)
+        
+        # Construimos la URL completa (http://ip:puerto)
+        full_base_url = f"{request.scheme}://{request.host}"
+        
+        playlist_service = PlaylistService()
+        playlist = playlist_service.generate_m3u_with_epg(
+            search_term=search,
+            favorites_only=favorites,
+            base_url=full_base_url
+        )
+        
+        # Construcción dinámica del nombre del archivo
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+        filename = f"m3u_playlist_with_epg_{timestamp}"
+        
+        if search:
+            filename += "_filtered"
+        if favorites:
+            filename += "_favorites"
+            
+        filename += ".m3u"
+        
+        return Response(
+            playlist,
+            mimetype="audio/x-mpegurl",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+                        
 @api.route('/channels')
 class PlaylistChannels(Resource):
     @api.doc('get_playlist_channels')

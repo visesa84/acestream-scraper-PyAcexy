@@ -483,6 +483,33 @@ function downloadEpgXml() {
     window.location.href = urlInput.value;
 }
 
+function downloadEpgPlaylist() {
+    const url = document.getElementById('epgPlaylistUrl').value;
+    window.location.href = url;
+}
+
+function updateEpgPlaylistUrl() {
+    const urlInput = document.getElementById('epgPlaylistUrl');
+	if (!urlInput) return;
+    
+    // Get base URL
+    const baseUrl = urlInput.getAttribute('data-base-url');
+    if (!baseUrl) return;
+    
+    // Check if favorites only is selected
+    const favoritesOnly = document.getElementById('epgPlaylistFavoritesOnly')?.checked || false;
+    
+    // Build URL with proper parameters
+    let url = baseUrl;
+    if (favoritesOnly) {
+        url += (url.includes('?') ? '&' : '?') + 'favorites_only=true';
+    }
+    
+    // Update URL in input field
+    urlInput.value = url;
+}
+
+
 /**
  * Copy content to clipboard
  * @param {string} elementSelector - CSS selector for the element to copy from

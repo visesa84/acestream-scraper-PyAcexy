@@ -1,5 +1,7 @@
 import os
 import base64
+import time
+import html
 from datetime import datetime
 from flask import request
 from urllib.parse import urlparse, quote
@@ -335,15 +337,15 @@ class PlaylistService:
             for stream_index, acestream in enumerate(sorted_acestreams):
                 # Handle duplicate names and multiple streams per channel
                 if len(sorted_acestreams) > 1:
-                    # Multiple streams: use numeric suffix (Antena 3 1, Antena 3 2, etc.)
-                    display_name = f"{tv_channel.name} {stream_index + 1}"
-                    epg_id = f"{tv_channel.epg_id}.{stream_index + 1}"
+                    # El nombre visual lleva #, pero el ID técnico es el ORIGINAL
+                    display_name = f"{tv_channel.name} #{stream_index + 1}"
+                    epg_id = tv_channel.epg_id  # <--- ID limpio sin sufijos
                 else:
                     # Single stream: check for global name duplicates
                     if base_name in name_counts:
                         name_counts[base_name] += 1
-                        display_name = f"{base_name} {name_counts[base_name]}"
-                        epg_id = f"{tv_channel.epg_id}.{name_counts[base_name]}"
+                        display_name = f"{base_name} #{name_counts[base_name]}"
+                        epg_id = tv_channel.epg_id # <--- ID limpio sin sufijos
                     else:
                         name_counts[base_name] = 1
                         display_name = base_name
@@ -356,7 +358,7 @@ class PlaylistService:
                     'tv_channel': tv_channel,
                     'epg_channel': epg_channel,
                     'stream_index': stream_index,
-                    'original_epg_id': tv_channel.epg_id  # Store original ID for program data
+                    'original_epg_id': tv_channel.epg_id
                 })
         
         # Generate channel definitions
@@ -379,43 +381,48 @@ class PlaylistService:
         xml_lines.append('')
         
         # Get program data for each channel mapping
+        processed_epg_ids = set()
+        
+        # Get program data for each channel mapping
         for mapping in channel_epg_mappings:
             epg_id = mapping['epg_id']
-            original_epg_id = mapping['original_epg_id']
             epg_channel = mapping['epg_channel']
             
-            if not epg_channel:
+            # SI YA PROCESAMOS ESTE ID, SALTAMOS AL SIGUIENTE
+            if not epg_channel or epg_id in processed_epg_ids:
                 continue
+            
+            # Marcar este ID como procesado
+            processed_epg_ids.add(epg_id)
             
             # Get programs for this channel
             now = datetime.utcnow()
-            start_time = now - timedelta(hours=12)  # Include past 12 hours
-            end_time = now + timedelta(days=7)     # Include next 7 days
+            start_time = now - timedelta(hours=12)
+            end_time = now + timedelta(days=7)
             
-            # Get programs using the epg_channel object
             programs = epg_program_repo.get_programs_for_channel(epg_channel.id, start_time, end_time)
             
-            # Generate program entries - each variant of a channel needs its own program entries
-            # with the correct channel ID
+            # Detectar el offset real del contenedor (usa la variable TZ)
+            is_dst = time.localtime().tm_isdst
+            offset_seconds = -(time.altzone if is_dst else time.timezone)
+            
+            # Convertir segundos a formato XMLTV (+HHMM)
+            h, m = divmod(abs(offset_seconds) // 60, 60)
+            sign = '+' if offset_seconds >= 0 else '-'
+            local_offset = f"{sign}{h:02d}{m:02d}"
+
+            # Aplicar a los programas
             for program in programs:
-                # Convertir fechas (Acceso como diccionario)
                 start_dt = datetime.fromisoformat(program['start_time'])
-                start_time_str = start_dt.strftime("%Y%m%d%H%M%S %z")
-                
                 end_dt = datetime.fromisoformat(program['end_time'])
-                stop_time_str = end_dt.strftime("%Y%m%d%H%M%S %z") # <--- Cambiado de end_time_str a stop_time_str
                 
-                # Asegurar zona horaria
-                if start_time_str.endswith(' '):
-                    start_time_str += '+0000'
-                if stop_time_str.endswith(' '):
-                    stop_time_str += '+0000'
+                # Construir el string final con el offset detectado del sistema
+                start_time_str = f"{start_dt.strftime('%Y%m%d%H%M%S')} {local_offset}"
+                stop_time_str = f"{end_dt.strftime('%Y%m%d%H%M%S')} {local_offset}"
                 
-                # Construir XML (Cambiado a acceso de diccionario: program['clave'])
                 xml_lines.append(f'  <programme start="{start_time_str}" stop="{stop_time_str}" channel="{html.escape(epg_id)}">')
                 
-                # Usar .get() para evitar errores si la clave no existe
-                title = program.get('title', 'Sin título')
+                title = program.get('title', 'Untitled')
                 xml_lines.append(f'    <title>{html.escape(str(title))}</title>')
                 
                 desc = program.get('description')
@@ -427,10 +434,8 @@ class PlaylistService:
                     xml_lines.append(f'    <category>{html.escape(str(cat))}</category>')
                 
                 xml_lines.append('  </programme>')
-        
-        # Close the XML document
+
         xml_lines.append('</tv>')
-        
         return '\n'.join(xml_lines)
     
     def generate_all_streams_playlist(self, search_term=None, include_unassigned=True, base_url=None):
@@ -660,3 +665,58 @@ class PlaylistService:
             playlist_lines.append(stream_url)
                     
         return '\n'.join(playlist_lines)
+        
+    def generate_m3u_with_epg(self, base_url=None, search_term=None, favorites_only=False):
+        
+        # 1. Cabecera con URL del EPG
+        epg_url = f"{base_url}/api/playlists/epg.xml" if base_url else ""
+        m3u_lines = [f'#EXTM3U x-tvg-url="{epg_url}"']
+
+        # 2. Obtener canales
+        channels, _, _ = self.tv_channel_repository.filter_channels(
+            search_term=search_term, 
+            favorites_only=favorites_only, 
+            is_active=True, 
+            per_page=1000
+        )
+        
+        name_counts = {}
+        local_id = 0 # Inicializamos el contador igual que en el otro método
+        
+        # Ordenar por número de canal o nombre
+        sorted_channels = sorted(channels, key=lambda c: (c.channel_number is None, c.channel_number or 0, c.name.lower()))
+
+        for tv_channel in sorted_channels:
+            # Solo acestreams activos para este canal de TV
+            acestreams = AcestreamChannel.query.filter(
+                AcestreamChannel.tv_channel_id == tv_channel.id, 
+                AcestreamChannel.status == 'active'
+            ).all()
+            
+            if not acestreams: continue
+
+            for i, stream in enumerate(acestreams):
+                # 3. Generar URL del stream usando el formateador interno
+                stream_url = self._format_stream_url(stream.id, local_id, base_url=base_url)
+                local_id += 1 # Incrementar para el siguiente stream
+
+                # 4. Lógica de nombres con #
+                if len(acestreams) > 1:
+                    display_name = f"{tv_channel.name} #{i + 1}"
+                elif tv_channel.name in name_counts:
+                    name_counts[tv_channel.name] += 1
+                    display_name = f"{tv_channel.name} #{name_counts[tv_channel.name]}"
+                else:
+                    name_counts[tv_channel.name] = 1
+                    display_name = tv_channel.name
+
+                # 5. Metadatos (Priorizamos los del canal de TV para que coincidan con el EPG)
+                tvg_id = tv_channel.epg_id or ""
+                logo = tv_channel.logo_url or ""
+                group = tv_channel.category or "General"
+                
+                # Construcción de la línea #EXTINF
+                m3u_lines.append(f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-logo="{logo}" group-title="{group}",{display_name}')
+                m3u_lines.append(stream_url)
+
+        return "\n".join(m3u_lines)
