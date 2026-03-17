@@ -374,7 +374,10 @@ class UnassignedAcestreamsResource(Resource):
         search_term = args.get('search', '')
         
         # Base query for unassigned acestreams
-        query = AcestreamChannel.query.filter_by(tv_channel_id=None)
+        query = AcestreamChannel.query.filter(
+            AcestreamChannel.tv_channel_id == None,
+            AcestreamChannel.status != 'disabled'
+        )
         
         # Add search filter if provided
         if search_term:

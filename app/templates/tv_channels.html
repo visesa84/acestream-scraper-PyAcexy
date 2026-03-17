@@ -88,7 +88,41 @@ block content %}
           </div>
           <small class="text-muted">TV channels + unassigned streams with channel numbers</small>
         </div>
-        
+		
+		<!-- Online Streams Playlist -->
+		<div class="col-md-4 mb-3">
+          <h6 class="mb-2">M3U Playlist Online Streams URL</h6>
+          <div class="input-group mb-2">
+            <input type="text" class="form-control" id="onlinePlaylistUrl" data-base-url="{{ request.url_root }}api/playlists/online/m3u" value="{{ request.url_root }}api/playlists/online/m3u" readonly>
+            <button class="btn btn-outline-secondary" type="button" id="copyPlaylistOnlineBtn" onclick="copyToClipboard('#onlinePlaylistUrl')">Copy</button>
+          </div>
+          <div class="d-flex justify-content-end mt-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="downloadOnlinePlaylist()">
+              <i class="bi bi-download me-1"></i> Download Playlist
+            </button>
+          </div>
+          <small class="text-muted">All streams with online status</small>
+        </div>
+		
+		<!-- Streams Playlist with EPG -->
+		<div class="col-md-4 mb-3">
+          <h6 class="mb-2">M3U Playlist with Integrated EPG</h6>
+          <div class="input-group mb-2">
+            <input type="text" class="form-control border-primary" id="epgPlaylistUrl" data-base-url="{{ request.url_root }}api/playlists/m3u/epg" value="{{ request.url_root }}api/playlists/m3u/epg" readonly>
+            <button class="btn btn-outline-primary" type="button" onclick="copyToClipboard('#epgPlaylistUrl')">Copy</button>
+          </div>
+		  <!-- Hidden checkbox for compatibility with existing JS -->
+          <div class="d-none">
+            <input class="form-check-input" type="checkbox" id="epgPlaylistFavoritesOnly" onchange="updateEpgPlaylistUrl()">
+          </div>
+          <div class="d-flex justify-content-end mt-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="downloadEpgPlaylist()">
+              <i class="bi bi-download me-1"></i> Download Playlist
+            </button>
+          </div>
+          <small class="text-muted">This playlist automatically links to your EPG XML</small>
+        </div>
+		
         <!-- EPG XML -->
         <div class="col-md-4 mb-3">
           <h6 class="mb-2">EPG XML Guide URL</h6>
@@ -106,20 +140,7 @@ block content %}
             </button>
           </div>
           <small class="text-muted">Only channels with acestreams and EPG data</small>
-        </div>
-		<div class="col-md-4 mb-3">
-          <h6 class="mb-2">M3U Playlist Online Streams URL</h6>
-          <div class="input-group mb-2">
-            <input type="text" class="form-control" id="onlinePlaylistUrl" data-base-url="{{ request.url_root }}api/playlists/online/m3u" value="{{ request.url_root }}api/playlists/online/m3u" readonly>
-            <button class="btn btn-outline-secondary" type="button" id="copyPlaylistOnlineBtn" onclick="copyToClipboard('#onlinePlaylistUrl')">Copy</button>
-          </div>
-          <div class="d-flex justify-content-end mt-2">
-            <button class="btn btn-outline-primary btn-sm" onclick="downloadOnlinePlaylist()">
-              <i class="bi bi-download me-1"></i> Download Playlist
-            </button>
-          </div>
-          <small class="text-muted">All streams with online status</small>
-        </div>
+        </div>		
       </div>
     </div>
   </div>
