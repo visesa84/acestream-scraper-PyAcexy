@@ -69,20 +69,28 @@ jobs:
           docker buildx imagetools create -t ${{ env.IMAGE_NAME }}:latest \
             ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
 
-      # 3. LIMPIEZA DE TAGS TEMPORALES
+            # 3. LIMPIEZA DE TAGS TEMPORALES
       - name: Delete temp tags from Docker Hub
         run: |
-          # Obtener token de acceso
+          # 1. Obtener el token de acceso usando el endpoint de login correcto
           TOKEN=$(curl -s -H "Content-Type: application/json" \
             -X POST \
             -d '{"username": "${{ secrets.DOCKERHUB_USERNAME }}", "password": "${{ secrets.DOCKERHUB_TOKEN }}"}' \
-            https://hub.docker.com | jq -r .token)
+            https://hub.docker.com/v2/users/login/ | jq -r .token)
           
-          # Borrar cada tag temporal
+          # Verificar si obtuvimos el token para evitar errores posteriores
+          if [ "$TOKEN" == "null" ] || [ -z "$TOKEN" ]; then
+            echo "Error: No se pudo obtener el token de Docker Hub. Revisa tus credenciales."
+            exit 1
+          fi
+
+          # 2. Borrar cada tag temporal usando la URL de la API de repositorios
+          # Importante: IMAGE_NAME debe tener el formato "usuario/repo"
           for TAG in temp-amd64 temp-arm64 temp-armv7; do
-            curl -i -X DELETE \
+            echo "Borrando tag: $TAG..."
+            curl -s -X DELETE \
               -H "Authorization: JWT ${TOKEN}" \
-              https://hub.docker.com{{ env.IMAGE_NAME }}/tags/${TAG}/
+              "https://hub.docker.com/v2/repositories/${{ env.IMAGE_NAME }}/tags/${TAG}/"
           done
 
       # 4. GITHUB RELEASE
