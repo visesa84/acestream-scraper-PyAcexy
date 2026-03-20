@@ -1,4 +1,4 @@
-name: Release y Docker Hub
+name: Release y Docker Hub Multi-Arch
 
 on:
   push:
@@ -10,20 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    
+    env:
+      IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/acestream-scraper-pyacexy
+
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Extraer mensaje manual del tag
-        id: tag_message
-        run: |
-          MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
-          [ -z "$MESSAGE" ] && MESSAGE="Nueva versión ${{ github.ref_name }}"
-          echo "manual_text<<EOF" >> $GITHUB_OUTPUT
-          echo "$MESSAGE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login en Docker Hub
         uses: docker/login-action@v3
@@ -31,22 +30,64 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      # 1. CONSTRUCCIÓN DE LAS IMÁGENES TEMPORALES
+      - name: Build AMD64
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
           push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/acestream-scraper-pyacexy:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/acestream-scraper-pyacexy:${{ github.ref_name }}
+          tags: ${{ env.IMAGE_NAME }}:temp-amd64
 
+      - name: Build ARM64
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./arm/arm64/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:temp-arm64
+
+      - name: Build ARMv7
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./arm/arm32/Dockerfile
+          platforms: linux/arm/v7
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:temp-armv7
+
+      # 2. CREACIÓN DE LOS MANIFIESTOS
+      - name: Create and push Multi-Arch Manifests
+        run: |
+          docker buildx imagetools create -t ${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            ${{ env.IMAGE_NAME }}:temp-amd64 \
+            ${{ env.IMAGE_NAME }}:temp-arm64 \
+            ${{ env.IMAGE_NAME }}:temp-armv7
+            
+          docker buildx imagetools create -t ${{ env.IMAGE_NAME }}:latest \
+            ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+
+      # 3. LIMPIEZA DE TAGS TEMPORALES
+      - name: Delete temp tags from Docker Hub
+        run: |
+          # Obtener token de acceso
+          TOKEN=$(curl -s -H "Content-Type: application/json" \
+            -X POST \
+            -d '{"username": "${{ secrets.DOCKERHUB_USERNAME }}", "password": "${{ secrets.DOCKERHUB_TOKEN }}"}' \
+            https://hub.docker.com | jq -r .token)
+          
+          # Borrar cada tag temporal
+          for TAG in temp-amd64 temp-arm64 temp-armv7; do
+            curl -i -X DELETE \
+              -H "Authorization: JWT ${TOKEN}" \
+              https://hub.docker.com{{ env.IMAGE_NAME }}/tags/${TAG}/
+          done
+
+      # 4. GITHUB RELEASE
       - name: Crear GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          body: |
-            ${{ steps.tag_message.outputs.manual_text }}
-            
-            ---
           generateReleaseNotes: true
-          prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}

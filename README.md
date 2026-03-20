@@ -6,6 +6,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 
 ## Features
 
+- **Multi-arch support: amd64, arm64 (v8), arm32 (v7)**
 - Scrapes Acestream channel information from multiple URLs
 - Extracts channel names and URLs from both JSON data and HTML content
 - Generates M3U playlists with optional refresh

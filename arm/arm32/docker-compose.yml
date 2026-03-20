@@ -1,0 +1,55 @@
+services:
+  acestream:
+    image: acestream32:test
+    platform: linux/arm/v7
+    container_name: acestream-arm32
+    network_mode: bridge
+    privileged: true
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=0
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - ENABLE_TOR=false
+      - ENABLE_ACEXY=true
+      - ENABLE_ACESTREAM_ENGINE=true
+      - WG_QUICK_USERSPACE_IMPLEMENTATION=wireguard-go
+      - WG_THREADS=4
+      - ENABLE_WARP=false
+      - CONTAINER_NETWORK_MODE=bridge
+      - WARP_LICENSE_KEY=
+      - ACESTREAM_HTTP_PORT=6878
+      - ACESTREAM_HTTP_HOST=ACEXY_HOST
+      - FLASK_PORT=8040
+      - ACEXY_LISTEN_ADDR=:8080
+      - ACEXY_PORT=6878
+      - ACEXY_HOST=localhost
+      - ALLOW_REMOTE_ACCESS=no
+      - ACEXY_BUFFER_SIZE=10
+      - EXTRA_FLAGS=--cache-dir /tmp --cache-limit 2 --log-stderr --log-stderr-level error --max-connections 300 --max-peers 50 --core-dlrate-helper 0 --stats-report-interval 10 --live-cache-type memory --live-cache-size 209715200
+      - TZ=Europe/Madrid
+    ports:
+      - "43110:43110"
+      - "43111:43111"
+      - "26552:26552"
+      - "6878:6878"
+      - "8040:8040"
+      - "8080:8080"
+      - "8621:8621/tcp"
+      - "8621:8621/udp"
+    volumes:
+      - ./Docker:/app/ZeroNet/data
+      - ./Docker:/app/config
+      - ./Docker/recordings:/app/config/recordings
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/app/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
