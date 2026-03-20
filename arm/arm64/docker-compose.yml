@@ -1,8 +1,8 @@
 services:
   acestream:
-    image: acestream32:test
     platform: linux/arm/v7
-    container_name: acestream-arm32
+    image: visesa84/acestream-scraper-pyacexy:latest
+    container_name: Acestream_Proxy
     network_mode: bridge
     privileged: true
     devices:
