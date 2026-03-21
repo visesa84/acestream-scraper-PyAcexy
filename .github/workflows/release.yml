@@ -39,6 +39,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ env.IMAGE_NAME }}:temp-amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build ARM64
         uses: docker/build-push-action@v5
@@ -48,6 +50,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: ${{ env.IMAGE_NAME }}:temp-arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build ARMv7
         uses: docker/build-push-action@v5
@@ -57,6 +61,8 @@ jobs:
           platforms: linux/arm/v7
           push: true
           tags: ${{ env.IMAGE_NAME }}:temp-armv7
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # 2. CREACIÓN DE LOS MANIFIESTOS
       - name: Create and push Multi-Arch Manifests
@@ -69,7 +75,7 @@ jobs:
           docker buildx imagetools create -t ${{ env.IMAGE_NAME }}:latest \
             ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
 
-            # 3. LIMPIEZA DE TAGS TEMPORALES
+      # 3. LIMPIEZA DE TAGS TEMPORALES
       - name: Delete temp tags from Docker Hub
         run: |
           # 1. Obtener el token de acceso usando el endpoint de login correcto
@@ -84,8 +90,7 @@ jobs:
             exit 1
           fi
 
-          # 2. Borrar cada tag temporal usando la URL de la API de repositorios
-          # Importante: IMAGE_NAME debe tener el formato "usuario/repo"
+          # Borrar cada tag temporal usando la URL de la API de repositorios
           for TAG in temp-amd64 temp-arm64 temp-armv7; do
             echo "Borrando tag: $TAG..."
             curl -s -X DELETE \
@@ -93,9 +98,31 @@ jobs:
               "https://hub.docker.com/v2/repositories/${{ env.IMAGE_NAME }}/tags/${TAG}/"
           done
 
-      # 4. GITHUB RELEASE
+      # --- PASO PREVIO AL RELEASE ---
+      - name: Extraer mensaje manual del tag
+        id: tag_message
+        run: |
+          # Obtenemos el mensaje que escribiste al crear el tag (git tag -a v1.0.1 -m "Mi mensaje")
+          MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
+          # Si el mensaje está vacío, ponemos uno por defecto
+          if [ -z "$MESSAGE" ]; then
+            MESSAGE="New version ${{ github.ref_name }}"
+          fi
+          # Guardamos el mensaje en el output para usarlo en el siguiente paso
+          echo "manual_text<<EOF" >> $GITHUB_OUTPUT
+          echo "$MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # --- 4. GITHUB RELEASE ---
       - name: Crear GitHub Release
         uses: ncipollo/release-action@v1
         with:
+          body: |
+            ${{ steps.tag_message.outputs.manual_text }}
+            
+            ---
+
           generateReleaseNotes: true
+          prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
+
