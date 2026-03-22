@@ -14,7 +14,7 @@ FROM --platform=linux/arm/v7 python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Acestream channel scraper with ZeroNet support" \
-      version="2.7"
+      version="2.8"
 
 WORKDIR /app
 RUN mkdir -p /app/config

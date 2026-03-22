@@ -294,6 +294,7 @@ async function loadEpgChannels(page = 1, searchTerm = '') {
         }
         
 		epgState.epgChannels = data.channels;
+		epgState.totalChannels = data.total_channels;
 		
         if (!data.channels || !data.channels.length) {
             tableBody.innerHTML = `
@@ -458,7 +459,7 @@ function updateEpgStatistics() {
     // Update channels count
     const channelsCount = document.getElementById('epgChannelsCount');
     if (channelsCount) {
-        channelsCount.textContent = epgState.epgChannels.length;
+        channelsCount.textContent = epgState.totalChannels || '0';
     }
     
     // Update mappings count
