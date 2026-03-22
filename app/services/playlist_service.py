@@ -669,7 +669,15 @@ class PlaylistService:
     def generate_m3u_with_epg(self, base_url=None, search_term=None, favorites_only=False):
         
         # 1. Cabecera con URL del EPG
-        epg_url = f"{base_url}/api/playlists/epg.xml" if base_url else ""
+        user, password = self.get_basic_auth_credentials()
+
+        if user and password and base_url:
+            # Inyectamos las credenciales en la URL del EPG que va dentro del M3U
+            parsed = urlparse(base_url)
+            epg_url = f"{parsed.scheme}://{user}:{password}@{parsed.netloc}/api/playlists/epg.xml"
+        else:
+            epg_url = f"{base_url}/api/playlists/epg.xml" if base_url else ""
+
         m3u_lines = [f'#EXTM3U x-tvg-url="{epg_url}"']
 
         # 2. Obtener canales
@@ -681,7 +689,7 @@ class PlaylistService:
         )
         
         name_counts = {}
-        local_id = 0 # Inicializamos el contador igual que en el otro método
+        local_id = 0 # Inicializamos el contador
         
         # Ordenar por número de canal o nombre
         sorted_channels = sorted(channels, key=lambda c: (c.channel_number is None, c.channel_number or 0, c.name.lower()))
