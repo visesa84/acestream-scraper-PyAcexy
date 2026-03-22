@@ -14,7 +14,7 @@ FROM python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Base image for Acestream channel scraper with pyacexy" \
-      version="2.7"
+      version="2.8"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -152,7 +152,7 @@ FROM base
 
 # Update metadata labels for the final image
 LABEL description="Acestream channel scraper with ZeroNet support" \
-      version="2.7"
+      version="2.8"
 
 # Copy application files
 COPY --chmod=0755 entrypoint.sh /app/entrypoint.sh

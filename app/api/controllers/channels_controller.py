@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from flask_restx import Namespace, Resource, fields, reqparse
+from flask_restx import Namespace, Resource, fields, reqparse, marshal
 from flask import request
 from sqlalchemy import or_
 from app.models import AcestreamChannel
@@ -64,13 +64,17 @@ channel_update_model = api.model('ChannelUpdate', {
 
 })
 
-# Updated parser to include URL ID filter parameter
+# Updated parser to include filter parameter
 channel_parser = reqparse.RequestParser()
 channel_parser.add_argument('search', type=str, required=False, help='Filter channels by name')
 channel_parser.add_argument('url_id', type=str, required=False, help='Filter channels by source URL ID')
+channel_parser.add_argument('source_url', type=str, required=False, help='Filter channels by source URL string')
 channel_parser.add_argument('page', type=int, required=False, default=1, help='Page number')
 channel_parser.add_argument('per_page', type=int, required=False, default=25, help='Items per page')
 channel_parser.add_argument('status', type=str, required=False, help='Filter by status')
+channel_parser.add_argument('with_epg', type=str, required=False, help='Filter only channels with EPG data (true/false)')
+channel_parser.add_argument('count_only', type=str, required=False, help='Return only the total count (true/false)')
+
 
 channel_repo = ChannelRepository()
 url_repo = URLRepository()
@@ -84,7 +88,7 @@ def handle_repository_error(e: Exception, operation: str):
 class ChannelList(Resource):
     @api.doc('list_channels')
     @api.expect(channel_parser)
-    @api.marshal_list_with(channel_model)
+    @api.response(200, 'Success', channel_model)
     @api.param('search', 'Search query to filter channels')
     @api.param('url_id', 'URL ID to filter channels by source')
     @api.param('source_url', 'Source URL to filter channels directly by source')
@@ -93,9 +97,24 @@ class ChannelList(Resource):
         search_query = request.args.get('search', '')
         url_id = request.args.get('url_id', '')
         source_url = request.args.get('source_url', '')
+        with_epg = request.args.get('with_epg', '').lower() == 'true'
+        count_only = request.args.get('count_only', '').lower() == 'true'
         
         # Create base query
         query = AcestreamChannel.query
+        
+        # --- FILTRO EPG ---
+        if with_epg:
+            # Filtra canales donde tvg_name no sean nulos ni vacíos
+            query = query.filter(
+                or_(
+                    AcestreamChannel.tvg_name.isnot(None)
+                )
+            ).filter(
+                or_(
+                    AcestreamChannel.tvg_name != ''
+                )
+            )
         
         # Apply filters
         if search_query:
@@ -140,14 +159,15 @@ class ChannelList(Resource):
         # Directly filter by source URL if provided (new parameter)
         if source_url:
             query = query.filter(AcestreamChannel.source_url == source_url)
+            
+        if count_only:
+            total = query.count()
+            return {'total': total}
         
         # Execute query and get results
         channels = query.all()
         
-        # Serialize the results
-        result = [channel.to_dict() for channel in channels]
-
-        return result
+        return marshal(channels, channel_model)
     
     @api.doc('create_channel')
     @api.expect(channel_input_model)
