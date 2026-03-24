@@ -182,3 +182,9 @@ zeronet_data/
 
 new_era_iframe_sample.html
 new_era_sample.html
+
+*.tar.gz
+*.zip
+*.log
+__pycache__/
+.env
