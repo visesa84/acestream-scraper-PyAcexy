@@ -66,6 +66,11 @@ status_check_interval_model = api.model('StatusCheckInterval', {
 
 @api.route('/base_url')
 class BaseURL(Resource):
+    def get(self):
+        """Get the current base URL."""
+        config = Config()
+        return {"base_url": config.base_url}, 200
+        
     @api.doc('update_base_url')
     @api.expect(base_url_model)
     def put(self):
@@ -85,6 +90,11 @@ class BaseURL(Resource):
 
 @api.route('/ace_engine_url')
 class AceEngineURL(Resource):
+    def get(self):
+        """Get the current Ace Engine URL."""
+        config = Config()
+        return {"ace_engine_url": config.ace_engine_url}, 200
+        
     @api.doc('update_ace_engine_url')
     @api.expect(ace_engine_url_model)
     def put(self):

@@ -14,7 +14,7 @@ FROM --platform=linux/arm/v7 python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Acestream channel scraper with ZeroNet support" \
-      version="2.8"
+      version="2.9"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -59,18 +59,13 @@ RUN pip install --no-cache-dir \
     "base58" "defusedxml" "rsa" "psutil"
 
 # --- INSTALACIÓN DE PYACEXY ---
-RUN git clone https://github.com/wafy80/pyacexy /opt/pyacexy && \
-    cd /opt/pyacexy && \
-    pip install --no-cache-dir --break-system-packages -r requirements.txt
+COPY pyacexy/ /opt/pyacexy/
 
-RUN cp /opt/pyacexy/pyacexy/proxy.py /usr/local/bin/pyacexy && \
-    cp /opt/pyacexy/pyacexy/aceid.py /usr/local/bin/aceid.py && \
-    cp /opt/pyacexy/pyacexy/copier.py /usr/local/bin/copier.py && \
-    sed -i '4i import sys' /usr/local/bin/pyacexy && \
-    sed -i '9i sys.path.append(os.path.dirname(os.path.realpath(__file__)))' /usr/local/bin/pyacexy && \
-    sed -i 's/from \.aceid/from aceid/g' /usr/local/bin/pyacexy && \
-    sed -i 's/from \.copier/from copier/g' /usr/local/bin/pyacexy && \
-    sed -i '/async def start_server/i \    async def handle_status(self, request: web.Request) -> web.Response:\n        status_data = {"total_active_streams": len(self.streams), "streams": []}\n        async with self.streams_lock:\n            for key, ongoing in self.streams.items():\n                status_data["streams"].append({"id": key, "clients": len(ongoing.clients), "is_stopping": ongoing.stopping})\n        return web.json_response(status_data)\n' /usr/local/bin/pyacexy
+RUN cp /opt/pyacexy/proxy.py /usr/local/bin/pyacexy && \
+    cp /opt/pyacexy/aceid.py /usr/local/bin/aceid.py && \
+    cp /opt/pyacexy/copier.py /usr/local/bin/copier.py && \
+	cd /opt/pyacexy && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Descargar e instalar ZeroNet
 RUN mkdir -p ZeroNet && \
