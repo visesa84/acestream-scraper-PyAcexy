@@ -39,8 +39,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ env.IMAGE_NAME }}:temp-amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
 
       - name: Build ARM64
         uses: docker/build-push-action@v5
@@ -50,8 +50,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: ${{ env.IMAGE_NAME }}:temp-arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
 
       - name: Build ARMv7
         uses: docker/build-push-action@v5
@@ -61,8 +61,8 @@ jobs:
           platforms: linux/arm/v7
           push: true
           tags: ${{ env.IMAGE_NAME }}:temp-armv7
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=armv7
+          cache-to: type=gha,mode=max,scope=armv7
 
       # 2. CREACIÓN DE LOS MANIFIESTOS
       - name: Create and push Multi-Arch Manifests
