@@ -1,20 +1,22 @@
 # --- STAGE 0: Compilación de BoringTun Estable ---
-FROM rust:1.82-slim AS builder
+FROM rust:1.85-slim AS builder
 RUN apt-get update && apt-get install -y pkg-config libssl-dev git && \
     # Clonamos el repo oficial
     git clone https://github.com/cloudflare/boringtun.git /src
 
 WORKDIR /src
 
-# Usa las versiones exactas que Cloudflare probó
-RUN cargo install --locked --path boringtun-cli
+# Forzamos las versiones compatibles de 'time' en el archivo de configuración del proyecto
+RUN sed -i 's/\[dependencies\]/\[dependencies\]\ntime = "=0.3.36"\ntime-core = "=0.1.2"/' boringtun-cli/Cargo.toml
+
+RUN cargo install --path boringtun-cli
 
 # --- STAGE 1: Base image con todas las dependencias (Alpine 3.21) ---
 FROM --platform=linux/arm/v7 python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Acestream channel scraper with ZeroNet support" \
-      version="3.0"
+      version="3.1"
 
 WORKDIR /app
 RUN mkdir -p /app/config

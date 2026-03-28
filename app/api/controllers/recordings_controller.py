@@ -101,9 +101,10 @@ class RecordingList(Resource):
 
         # 1) Procesar archivos físicos
         for filename in files_in_disk:
-            if not filename.lower().endswith('.mp4'): continue
+            if not (filename.lower().endswith('.mp4') or filename.lower().endswith('.ts')):
+                continue
             
-            match = re.search(r"_(\d+)(?:_part(\d+))?\.mp4$", filename)
+            match = re.search(r"_(\d+)(?:_part(\d+))?\.(?:mp4|ts)$", filename)
             program_id = int(match.group(1)) if match else None
             part_num = int(match.group(2)) if match and match.group(2) else 0
             
@@ -116,7 +117,13 @@ class RecordingList(Resource):
             # Lógica de estado de parte activa
             actual_status = 'completed'
             if rec and rec.status == 'recording':
-                has_newer = any(f"_{program_id}_part{part_num + 1}.mp4" in f for f in files_in_disk)
+                # Buscamos si existe una parte posterior sin importar la extensión
+                has_newer = any(
+                    f"_{program_id}_part{part_num + 1}.mp4" in f or 
+                    f"_{program_id}_part{part_num + 1}.ts" in f 
+                    for f in files_in_disk
+                )
+                
                 if not has_newer:
                     actual_status = 'recording'
 
@@ -156,6 +163,7 @@ class RecordingStop(Resource):
         rec = RecordingSchedule.query.filter_by(program_id=program_id).first()
         
         if rec and rec.status == 'recording':
+            rec.end_time = datetime.now()
             for proc in psutil.process_iter(['cmdline']):
                 try:
                     cmdline = " ".join(proc.info.get('cmdline') or [])
@@ -165,7 +173,6 @@ class RecordingStop(Resource):
                     pass
 
             # Actualizar base de datos
-            rec.status = 'completed'
             db.session.commit()
             
             return {
