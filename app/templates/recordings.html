@@ -161,6 +161,14 @@
 	input[type="time"]::-webkit-calendar-picker-indicator {
 		display: none; /* Opcional: esconde el reloj nativo para usar solo tus botones */
 	}
+	.spin {
+		animation: rotation 2s infinite linear;
+		display: inline-block;
+	}
+	@keyframes rotation {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(359deg); }
+	}
 </style>
 <script>
 /**
@@ -200,6 +208,7 @@ function loadRecordings() {
                 const hasFile = file.filename && file.filename.trim() !== "";
                 const isPending = file.status === 'pending';
                 const isRecording = file.status === 'recording';
+				const isConverting = file.status === 'converting';
                 const pId = file.program_id || 'null';
                 const fName = hasFile ? `'${file.filename}'` : 'null';
 
@@ -219,6 +228,7 @@ function loadRecordings() {
                     case 'recording': statusBadge = '<span class="badge pulse-red text-white">RECORDING</span>'; break;
                     case 'failed':    statusBadge = '<span class="badge bg-warning text-dark">FAILED</span>'; break;
                     case 'pending':   statusBadge = '<span class="badge bg-info text-dark">PENDING</span>'; break;
+					case 'converting': statusBadge = '<span class="badge bg-warning text-dark"><i class="bi bi-gear-fill spin"></i>CONVERTING</span>'; break;
                     default:          statusBadge = '<span class="badge bg-secondary">UNKNOWN</span>';
                 }
 
@@ -229,14 +239,16 @@ function loadRecordings() {
                 // 1. Botón de EDITAR (Verde) - Solo si es pending o recording
                 if (isPending || isRecording) {
                     actionButtons += `
-                        <button class="btn btn-success btn-sm shadow-sm" onclick='openEditModal(${fileJson})' title="Editar horario">
+                        <button class="btn btn-success btn-sm shadow-sm" onclick='openEditModal(${fileJson})' title="Edit schedule">
                             <i class="bi bi-pencil-square"></i>
                         </button>`;
-                }
+                }		
 
                 // 2. Botones de Control (Stop / Play / Download)
                 if (isRecording) {
                     actionButtons += `<button class="btn btn-sm btn-danger shadow-sm ms-1" onclick="stopRecording(${pId})"><i class="bi bi-stop-fill"></i> Stop</button>`;
+				} else if (isConverting) {
+					actionButtons += `<button class="btn btn-sm btn-secondary ms-1" disabled><i class="bi bi-hourglass-split"></i> Wait</button>`;
                 } else if (hasFile) {
                     actionButtons += `
                         <button class="btn btn-sm btn-primary ms-1" onclick="playVideo('${file.filename}', '${file.status}')"><i class="bi bi-play-fill"></i></button>
@@ -244,9 +256,12 @@ function loadRecordings() {
                 }
 
                 // 3. Botón de BORRAR (Solo si no está grabando)
-                if (!isRecording) {
-                    actionButtons += `<button class="btn btn-sm btn-outline-danger ms-1" onclick="deleteRecording(${pId}, ${fName})"><i class="bi bi-trash"></i></button>`;
-                }
+                if (!isRecording && !isConverting) {
+					actionButtons += `<button class="btn btn-sm btn-outline-danger ms-1" onclick="deleteRecording(${pId}, ${fName})"><i class="bi bi-trash"></i></button>`;
+				} else if (isConverting) {
+					// Opcional: Mostrar botón de borrar deshabilitado para que el usuario sepa que no puede ahora
+					actionButtons += `<button class="btn btn-sm btn-outline-secondary ms-1" disabled><i class="bi bi-trash"></i></button>`;
+				}
 
                 return `
                 <tr>

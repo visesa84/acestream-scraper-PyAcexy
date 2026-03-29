@@ -61,6 +61,8 @@ def process_recordings(app, single_program_id=None):
                     total_size = sum(os.path.getsize(os.path.join(save_path, f)) for f in parts)
                     if total_size > 0:
                         parts_ts = [f for f in os.listdir(save_path) if f.startswith(f"{clean_title}_{prog.id}") and f.endswith('.ts')]
+                        rec.status = 'converting'
+                        db.session.commit()
                         
                         for ts_file in parts_ts:
                             input_path = os.path.join(save_path, ts_file)
@@ -73,6 +75,7 @@ def process_recordings(app, single_program_id=None):
                                     os.remove(input_path)
                             except Exception as e:
                                 app.logger.error(f"Error converting recording for {prog.id}: {e}")
+                        
                         rec.status = 'completed'
                         app.logger.info(f"[CONVERTER] Successful: {prog.title} ID:{prog.id}")
                     else:
@@ -156,14 +159,13 @@ def process_recordings(app, single_program_id=None):
             stream_url = f"{base_url}{ace_chan.id}"
             
             # Comando FFmpeg
-            #cmd_str = f'ffmpeg -y -hide_banner -loglevel error -i "{stream_url}" -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 -rw_timeout 15000000 -t {int(duration)} -c:v copy -c:a aac -movflags +faststart -user_agent "prog_id:{prog.id}" "{filename}"'
             cmd_str = f'ffmpeg -y -hide_banner -loglevel error -fflags +genpts+discardcorrupt -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 -rw_timeout 15000000 -i "{stream_url}" -t {int(duration)} -c:v copy -c:a aac -af "aresample=async=1" -vsync 1 -user_agent "prog_id:{prog.id}" "{filename}"'
 
             try:
                 subprocess.Popen(cmd_str, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
                 rec.status = 'recording'
                 db.session.commit()
-                app.logger.info(f"[RECORDER] Started: {prog.title} (Custom Time) ID:{prog.id}")
+                app.logger.info(f"[RECORDER] Started: {prog.title} ID:{prog.id}")
             except Exception as e:
                 app.logger.error(f"Error starting recording for {prog.id}: {e}")
 

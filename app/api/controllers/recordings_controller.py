@@ -94,7 +94,7 @@ class UpdateRecordingTimes(Resource):
 class RecordingList(Resource):
     def get(self):
         items = []
-        valid_states = {'completed', 'recording', 'failed', 'pending'}
+        valid_states = {'completed', 'recording', 'failed', 'pending', 'converting'}
         schedules = RecordingSchedule.query.all()
         schedules_map = {s.program_id: s for s in schedules}
         files_in_disk = os.listdir(RECORDINGS_DIR)
@@ -116,16 +116,19 @@ class RecordingList(Resource):
 
             # Lógica de estado de parte activa
             actual_status = 'completed'
-            if rec and rec.status == 'recording':
-                # Buscamos si existe una parte posterior sin importar la extensión
-                has_newer = any(
-                    f"_{program_id}_part{part_num + 1}.mp4" in f or 
-                    f"_{program_id}_part{part_num + 1}.ts" in f 
-                    for f in files_in_disk
-                )
+            if rec:
+                if rec.status == 'converting':
+                    actual_status = 'converting'
+                elif rec.status == 'recording':
+                    # Buscamos si existe una parte posterior sin importar la extensión
+                    has_newer = any(
+                        f"_{program_id}_part{part_num + 1}.mp4" in f or 
+                        f"_{program_id}_part{part_num + 1}.ts" in f 
+                        for f in files_in_disk
+                    )
                 
-                if not has_newer:
-                    actual_status = 'recording'
+                    if not has_newer:
+                        actual_status = 'recording'
 
             items.append({
                 'filename': filename,
