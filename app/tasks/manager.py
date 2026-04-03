@@ -130,10 +130,11 @@ class TaskManager:
             try:
                 self.logger.info("Starting EPG refresh")
                 await self.epg_refresh_worker.refresh_epg_data()
-                self.last_epg_refresh = datetime.now(timezone.utc)
-                self.logger.info("EPG refresh completed successfully")
             except Exception as e:
                 self.logger.error(f"EPG refresh failed: {str(e)}")
+            finally:
+                self.last_epg_refresh = datetime.now(timezone.utc)
+                self.logger.info("EPG refresh completed successfully")
 
     async def start(self):
         """Main task loop."""

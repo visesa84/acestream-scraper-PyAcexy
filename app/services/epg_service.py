@@ -826,7 +826,6 @@ class EPGService:
                             # Update the channel in the database
                             try:
                                 self.channel_repo.update(channel)
-                                session.flush()
                                 
                                 stats["cleaned"] += 1
                                 logger.info(f"CLEANED: Channel '{channel.name}' (previous: {old_data}) - no mapping rules exist")
@@ -911,49 +910,31 @@ class EPGService:
 
     def get_channels_from_source(self, source_id):
         """
-        Get all EPG channels from a specific source.
-        
-        Args:
-            source_id: The EPG source ID
-            
-        Returns:
-            List of channel dictionaries
+        Obtiene los canales de EPG desde la base de datos local en lugar de internet.
         """
         try:
-            # Get the source from the database
-            epg_source_repo = EPGSourceRepository()
-            source = epg_source_repo.get_by_id(source_id)
+            # Buscamos en el repositorio de canales EPG, NO en la URL
+            db_channels = self.epg_channel_repo.get_by_source_id(source_id)
             
-            if not source:
-                logger.warning(f"EPG source {source_id} not found")
+            if not db_channels:
+                logger.warning(f"No channels were found in the database for the source {source_id}.")
                 return []
             
-            # Get XML content directly from URL
-            xml_content = None
+            # Convertimos los objetos de la base de datos al formato de diccionario 
+            channels = []
+            for ch in db_channels:
+                channels.append({
+                    'id': ch.channel_xml_id, # El ID del XML
+                    'name': ch.name,
+                    'logo': ch.icon_url,
+                    'language': ch.language
+                })
             
-            if source.url:
-                logger.info(f"Fetching data from URL for EPG source {source_id}: {source.url}")
-                try:
-                    response = requests.get(source.url, timeout=30)
-                    if response.status_code == 200:
-                        xml_content = response.text
-                    else:
-                        logger.error(f"Error fetching EPG source {source_id}: HTTP {response.status_code}")
-                except Exception as e:
-                    logger.error(f"Error fetching EPG source {source_id} URL: {str(e)}")
-            
-            if not xml_content:
-                logger.warning(f"No XML content available for EPG source {source_id}")
-                return []
-            
-            # Parse the XML content to get channels
-            channels = self.parse_epg_channels(xml_content)
-            
-            logger.info(f"Found {len(channels)} channels from EPG source {source_id}")
+            logger.info(f"Loaded {len(channels)} channels from the database for source {source_id}")
             return channels
             
         except Exception as e:
-            logger.error(f"Error getting channels from EPG source {source_id}: {str(e)}")
+            logger.error(f"Error retrieving channels from the DB for source {source_id}: {str(e)}")
             return []
 
     def get_epg_channels(self, page=1, per_page=50, source_id=None):
