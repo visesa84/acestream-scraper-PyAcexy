@@ -396,7 +396,7 @@ class PlaylistService:
             processed_epg_ids.add(epg_id)
             
             # Get programs for this channel
-            now = datetime.utcnow()
+            now = datetime.now()
             start_time = now - timedelta(hours=12)
             end_time = now + timedelta(days=7)
             

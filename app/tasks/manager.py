@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 import aiohttp
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional, List, Union, Dict, Any
 from ..models import ScrapedURL, AcestreamChannel
 from ..extensions import db
@@ -14,6 +14,7 @@ from ..services import ScraperService
 from ..repositories import URLRepository
 from ..utils.config import Config
 from .workers import EPGRefreshWorker
+from app.models.epg_source import EPGSource
 from app.services.epg_service import EPGService
 from app.services.tv_channel_service import TVChannelService
 from app.services.channel_status_service import start_background_check
@@ -108,33 +109,52 @@ class TaskManager:
     
     def should_refresh_epg(self):
         """Check if EPG data needs to be refreshed."""
-        if self.last_epg_refresh is None:
-            self.logger.info("Initial EPG refresh needed (no previous refresh recorded)")
-            return True
-        
+        sources = EPGSource.query.filter_by(enabled=True).all()
         config = Config()
         refresh_interval = timedelta(hours=config.epg_refresh_interval)
-        time_since_refresh = datetime.now(timezone.utc) - self.last_epg_refresh
-        should_refresh = time_since_refresh >= refresh_interval
-        
-        if should_refresh:
-            self.logger.info(f"EPG refresh needed (last refresh: {self.last_epg_refresh}, interval: {config.epg_refresh_interval} hours)")
-        else:
-            self.logger.debug(f"EPG refresh not needed yet (last refresh: {self.last_epg_refresh}, next in: {refresh_interval - time_since_refresh})")
-            
-        return should_refresh
+        now = datetime.now()
+
+        for source in sources:
+            if not source.last_updated:
+                self.logger.info(f"Source '{source.url}' requires initial refresh.")
+                return True
+                
+            if (now - source.last_updated) >= refresh_interval:
+                self.logger.info(f"Source '{source.url}' expired (Last: {source.last_updated}).")
+                return True
+                
+        return False
 
     async def refresh_epg_if_needed(self):
         """Refresh EPG data if the refresh interval has passed."""
-        if self.should_refresh_epg():
-            try:
-                self.logger.info("Starting EPG refresh")
-                await self.epg_refresh_worker.refresh_epg_data()
-            except Exception as e:
-                self.logger.error(f"EPG refresh failed: {str(e)}")
-            finally:
-                self.last_epg_refresh = datetime.now(timezone.utc)
-                self.logger.info("EPG refresh completed successfully")
+        sources = EPGSource.query.filter_by(enabled=True).all()
+        config = Config()
+        refresh_interval = timedelta(hours=config.epg_refresh_interval)
+        now = datetime.now()
+
+        for source in sources:
+            # Verificamos cada fuente individualmente
+            needs_update = (not source.last_updated) or \
+                           (now - source.last_updated >= refresh_interval)
+
+            if needs_update:
+                try:
+                    self.logger.info(f"Updating EPG from: {source.url}")
+                    
+                    await self.epg_refresh_worker.refresh_epg_data(source.url)
+                    
+                    # Actualizamos la DB específicamente para esta fuente
+                    source.last_updated = now
+                    source.error_count = 0
+                    db.session.commit()
+                    self.logger.info(f"EPG '{source.url}' successfully updated.")
+                    
+                except Exception as e:
+                    db.session.rollback()
+                    source.error_count += 1
+                    source.last_error = str(e)
+                    db.session.commit()
+                    self.logger.error(f"Error updating {source.url}: {e}")
 
     async def start(self):
         """Main task loop."""
@@ -151,7 +171,7 @@ class TaskManager:
                     await self.refresh_epg_if_needed()
 
                     config = Config()                    
-                    cutoff_time_epg = datetime.now(timezone.utc) - timedelta(hours=config.rescrape_interval)
+                    cutoff_time_epg = datetime.now() - timedelta(hours=config.rescrape_interval)
                     urls = ScrapedURL.query.filter(
                         (ScrapedURL.status != 'disabled') &  # Skip disabled URLs
                         ((ScrapedURL.status == 'pending') |
@@ -187,7 +207,7 @@ class TaskManager:
                         self.logger.debug("Automatic status checking is disabled by the user.")
                     
                     elif not self.is_checking_status:
-                        cutoff = datetime.now(timezone.utc) - timedelta(hours=config.checkstatus_interval)
+                        cutoff = datetime.now() - timedelta(hours=config.checkstatus_interval)
                         
                         channels = AcestreamChannel.query.filter(
                             (AcestreamChannel.status == 'active'),

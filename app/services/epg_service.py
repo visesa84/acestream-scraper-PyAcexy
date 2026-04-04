@@ -32,15 +32,29 @@ class EPGService:
         self.auto_mapping_threshold = 0.75  # Similarity threshold for auto-mapping
         self.data_dir = "data"  # Directory to store data files (e.g., timestamps)
     
-    def fetch_epg_data(self) -> Dict:
+    def fetch_epg_data(self, source_identifier=None) -> Dict:
         """Fetch EPG data from all enabled sources."""
         self.epg_data = {}  # Reset cache
         
-        # Get ENABLED sources only
-        sources = self.epg_source_repo.get_enabled()
+        try:
+            # Lógica inteligente
+            if isinstance(source_identifier, int):
+                sources = [self.epg_source_repo.get_by_id(source_identifier)]
+            elif isinstance(source_identifier, str):
+                sources = [self.epg_source_repo.get_by_url(source_identifier)]
+            else:
+                sources = self.epg_source_repo.get_enabled()
+            
+            # Limpiamos la lista de posibles Nones si la búsqueda falló
+            sources = [s for s in sources if s is not None]
+        except Exception as e:
+            logger.error(f"Error identifying EPG sources: {e}")
+            return {}
         
-        logger.info(f"Found {len(sources)} enabled EPG sources")
-        
+        if not sources:
+            logger.warning(f"No source was found for: {source_identifier}")
+            return {}
+               
         for source in sources:
             try:
                 logger.info(f"Fetching EPG data from {source.url}")
@@ -48,18 +62,17 @@ class EPGService:
                 if response.status_code == 200:
                     # Check if content is gzipped
                     is_gzipped = source.url.endswith('.gz') or 'content-encoding' in response.headers and response.headers['content-encoding'] == 'gzip'
-                    
+                        
                     # --- FIX DE CODIFICACIÓN ---
                     # Forzamos a requests a detectar la codificación real antes de sacar el .text
                     if response.encoding is None or response.encoding == 'ISO-8859-1':
                         response.encoding = response.apparent_encoding
-                    # ---------------------------
 
                     # Parse the XML content
                     if is_gzipped:
                         import gzip
                         import io
-                        
+                            
                         try:
                             logger.info(f"Detected gzipped content, attempting to decompress")
                             content = io.BytesIO(response.content)
@@ -71,15 +84,15 @@ class EPGService:
                             xml_content = response.text
                     else:
                         xml_content = response.text
-                        
+                            
                     source.cached_data = xml_content
-                    
+                        
                     # Prepare for bulk insertion
                     channels_to_insert = []
-                    
+                        
                     # Usamos tu lógica original de parseo
                     self._parse_epg_xml(xml_content, source.id)
-                    
+                        
                     # Prepare channel data for database storage
                     for channel_id, channel_data in self.epg_data.items():
                         if channel_data.get('source_id') == source.id:
@@ -91,21 +104,21 @@ class EPGService:
                                 'language': channel_data.get('language')
                             }
                             channels_to_insert.append(channel_db_data)
-                    
+                        
                     # Bulk insert channels to database
                     if channels_to_insert:
                         self.epg_channel_repo.delete_by_source_id(source.id)
                         inserted_count = self.epg_channel_repo.bulk_insert(channels_to_insert)
                         logger.info(f"Bulk inserted {inserted_count} channels from source {source.id}")
-                    
+                        
                     # Update last_updated timestamp
                     source.last_updated = datetime.now()
                     self.epg_source_repo.update(source)
                     logger.info(f"Updated last_updated timestamp for source {source.id}")
-            
+                
             except Exception as e:
                 logger.error(f"Error fetching EPG data from {source.url}: {e}")
-    
+        
         return self.epg_data    
     
     def _parse_epg_xml(self, xml_content: str, source_id: int) -> None:
@@ -256,8 +269,7 @@ class EPGService:
             # Handle the case where there's no timezone info
             if len(time_str) == 14 and re.match(r'^\d{14}$', time_str):
                 dt = datetime.strptime(time_str, '%Y%m%d%H%M%S')
-                #return dt.replace(tzinfo=timezone.utc)
-                return dt.replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
+                return dt.replace(tzinfo=tz).astimezone().replace(tzinfo=None)
             
             # Parse XMLTV format with timezone
             # First, try to manually parse the format which is more reliable for XMLTV
@@ -1065,6 +1077,8 @@ class EPGService:
         Returns:
             bool: True if EPG should be refreshed, False otherwise
         """
+        from app.utils.config import Config
+        
         # Get the most recently updated enabled EPG source
         sources = self.epg_source_repo.get_enabled()
         
@@ -1085,7 +1099,8 @@ class EPGService:
             return True
         
         # Define refresh interval (24 hours by default)
-        refresh_interval = timedelta(hours=24)
+        intervalo_horas = getattr(Config, 'epg_refresh_interval', 24) 
+        refresh_interval = timedelta(hours=intervalo_horas)
         
         current_time = datetime.now()
         next_refresh_time = latest_source.last_updated + refresh_interval

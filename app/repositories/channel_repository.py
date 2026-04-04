@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional
 from sqlalchemy.exc import SQLAlchemyError
 import logging
@@ -143,7 +143,7 @@ class ChannelRepository(BaseRepository[AcestreamChannel]):
             channel = self.get_by_id(channel_id)
             if channel:
                 channel.is_online = is_online
-                channel.last_checked = datetime.now(timezone.utc)
+                channel.last_checked = datetime.now()
                 channel.check_error = error
                 self._db.session.commit()
                 return channel

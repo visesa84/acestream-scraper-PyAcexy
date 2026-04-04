@@ -77,7 +77,7 @@ class EPGProgram(db.Model):
     def get_current_program_for_channel(epg_channel_id, current_time=None):
         """Get the current program for a channel."""
         if current_time is None:
-            current_time = datetime.utcnow()
+            current_time = datetime.now()
             
         return EPGProgram.query.filter(
             EPGProgram.epg_channel_id == epg_channel_id,

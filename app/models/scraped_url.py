@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from app.extensions import db
 import uuid
 
@@ -13,7 +13,7 @@ class ScrapedURL(db.Model):
     error_count = db.Column(db.Integer, default=0)
     last_error = db.Column(db.String(500), nullable=True)
     enabled = db.Column(db.Boolean, default=True)
-    added_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    added_at = db.Column(db.DateTime, default=lambda: datetime.now())
     url_type = db.Column(db.String(20), default='regular')  # 'regular', 'zeronet', etc.
     
     channels = db.relationship('AcestreamChannel', backref='source', lazy='dynamic')
@@ -24,7 +24,7 @@ class ScrapedURL(db.Model):
     def update_status(self, status, error=None):
         """Update the URL status and error information."""
         self.status = status
-        self.last_processed = datetime.now(timezone.utc)
+        self.last_processed = datetime.now()
         
         if status == 'failed' or status == 'error':
             self.error_count += 1

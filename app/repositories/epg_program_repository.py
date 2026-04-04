@@ -71,7 +71,7 @@ class EPGProgramRepository:
     def get_current_program(self, epg_channel_id: int, current_time: datetime = None) -> Optional[EPGProgram]:
         """Get the current program for a channel."""
         if current_time is None:
-            current_time = datetime.utcnow()
+            current_time = datetime.now()
         
         return EPGProgram.query.filter(
             EPGProgram.epg_channel_id == epg_channel_id,
@@ -126,7 +126,7 @@ class EPGProgramRepository:
     
     def update(self, program: EPGProgram) -> EPGProgram:
         """Update an existing program."""
-        program.updated_at = datetime.utcnow()
+        program.updated_at = datetime.now()
         db.session.commit()
         return program
     

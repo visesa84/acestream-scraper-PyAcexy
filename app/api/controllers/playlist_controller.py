@@ -1,7 +1,7 @@
 from flask_restx import Namespace, Resource, fields, reqparse
 from flask import Response, redirect, request, current_app
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from app.models import AcestreamChannel
 from app.services.playlist_service import PlaylistService
 from app.repositories import URLRepository
@@ -43,7 +43,7 @@ class M3UPlaylist(Resource):
         playlist_service = PlaylistService()
         playlist = playlist_service.generate_playlist(search_term=search, base_url=request.host)
         
-        filename = f"acestream_playlist_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        filename = f"acestream_playlist_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         if search:
             filename += f"_filtered"
         filename += ".m3u"
@@ -71,7 +71,7 @@ class TVChannelsPlaylist(Resource):
             base_url=request.host
         )
         
-        filename = f"tv_channels_playlist_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        filename = f"tv_channels_playlist_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         if search:
             filename += f"_filtered"
         if favorites_only:
@@ -101,7 +101,7 @@ class EPGXmlGuide(Resource):
             base_url=request.host
         )
         
-        filename = f"epg_guide_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        filename = f"epg_guide_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         if search:
             filename += f"_filtered"
         if favorites_only:
@@ -134,7 +134,7 @@ class PlaylistWithEPG(Resource):
         )
         
         # Construcción dinámica del nombre del archivo
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"m3u_playlist_with_epg_{timestamp}"
         
         if search:
@@ -188,7 +188,7 @@ class AllStreamsPlaylist(Resource):
             base_url=request.host
         )
         
-        filename = f"all_streams_playlist_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        filename = f"all_streams_playlist_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         if search:
             filename += f"_filtered"
         if not include_unassigned:
@@ -216,7 +216,7 @@ class OnlinePlaylist(Resource):
             base_url=request.host
         )
         
-        filename = f"online_streams_{datetime.now(timezone.utc).strftime('%H%M%S')}.m3u"
+        filename = f"online_streams_{datetime.now().strftime('%H%M%S')}.m3u"
         
         return Response(
             playlist,

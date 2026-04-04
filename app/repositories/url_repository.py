@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, List
 from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime, timezone
+from datetime import datetime
 from ..models import ScrapedURL
 from .base import BaseRepository
 
@@ -30,7 +30,7 @@ class URLRepository(BaseRepository[ScrapedURL]):
         url_obj = self.get_by_url(url)
         if url_obj:
             url_obj.status = status
-            url_obj.last_processed = datetime.now(timezone.utc)
+            url_obj.last_processed = datetime.now()
             if error:
                 url_obj.error_count = (url_obj.error_count or 0) + 1
                 url_obj.last_error = error
@@ -110,7 +110,7 @@ class URLRepository(BaseRepository[ScrapedURL]):
                 scraped_url = self.model(
                     url=url,
                     url_type=url_type,
-                    added_at=datetime.now(timezone.utc),
+                    added_at=datetime.now(),
                     enabled=enabled,
                     status='pending' if trigger_scrape else 'ok'
                 )
@@ -143,7 +143,7 @@ class URLRepository(BaseRepository[ScrapedURL]):
                 manual_url = self.model(
                     url=base_url,
                     url_type='manual',
-                    added_at=datetime.now(timezone.utc),
+                    added_at=datetime.now(),
                     enabled=False,  # Disabled so we don't try to scrape our own service
                     status='ok',
                     channel_count=0

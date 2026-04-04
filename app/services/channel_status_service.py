@@ -44,7 +44,7 @@ class ChannelStatusService:
         command_url = None
         download_speed = 0
         error_msg = "Unknown error"
-        check_time = datetime.utcnow()
+        check_time = datetime.now()
         
         try:
             # 1. PROXY

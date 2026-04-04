@@ -18,6 +18,10 @@ class EPGSourceRepository:
         """Get EPG source by ID."""
         return EPGSource.query.get(id)
     
+    def get_by_url(self, url: str) -> Optional[EPGSource]:
+        """Busca una fuente por su URL exacta."""
+        return EPGSource.query.filter_by(url=url).first()
+    
     def create(self, source: EPGSource) -> EPGSource:
         """Create a new EPG source."""
         db.session.add(source)
@@ -60,6 +64,6 @@ class EPGSourceRepository:
     
     def update_last_updated(self, source: EPGSource) -> EPGSource:
         """Update last_updated timestamp."""
-        source.last_updated = datetime.utcnow()
+        source.last_updated = datetime.now()
         db.session.commit()
         return source

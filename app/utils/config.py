@@ -16,7 +16,7 @@ class Config:
     DEFAULT_CHECKSTATUS_INTERVAL = 24
     DEFAULT_CHECKSTATUS_ENABLED = True
     DEFAULT_ADDPID = False
-    DEFAULT_EPG_REFRESH_INTERVAL = 6
+    DEFAULT_EPG_REFRESH_INTERVAL = 24
     
     _instance = None
     config_path = None
