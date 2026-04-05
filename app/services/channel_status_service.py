@@ -237,6 +237,15 @@ def start_background_check(channels, manager=None):
                     if batch:
                         logger.info(f"Processing pair: {i+1}-{min(i+batch_size, total)} of {total}")
                         await service.check_channels(batch)
+                        
+                        # Sincronizacion de nombres (Solo para los que están vivos)
+                        if manager:
+                            for canal in batch:
+                                canal = db.session.merge(canal, load=False)
+                                # Si el check dio positivo
+                                if getattr(canal, 'is_online', False):
+                                    await manager.sincronizar_nombre_acestream(canal)
+                        
                         db.session.commit()
                         db.session.expunge_all() # Saca los objetos de la RAM
                         db.session.remove()      # Cierra la sesión de este hilo/contexto

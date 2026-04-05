@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 import aiohttp
+import re
 from datetime import datetime, timedelta
 from typing import Optional, List, Union, Dict, Any
 from ..models import ScrapedURL, AcestreamChannel
@@ -155,6 +156,58 @@ class TaskManager:
                     source.last_error = str(e)
                     db.session.commit()
                     self.logger.error(f"Error updating {source.url}: {e}")
+                    
+    def limpiar_basico(self, texto_sucio):
+        """
+        Elimina cualquier enlace (http/https) que traiga.
+        """
+        if not texto_sucio:
+            return ""
+        # Eliminamos desde http hasta el siguiente espacio
+        texto = re.sub(r'https?://\S+', '', texto_sucio)
+        texto = re.sub(r'\|.*', '', texto)
+        texto = re.sub(r'-->.*', '', texto)
+        texto = re.sub(r'\(.*?\)', '', texto)
+        texto = re.sub(r'\[.*?\]', '', texto)
+        texto = re.sub(r'\bzeronet\b', '', texto, flags=re.IGNORECASE)
+        texto = re.sub(r'\S+\.(me|blog|com|es|net|org|tk|info|tv|top|xyz|link)\b', '', texto, flags=re.IGNORECASE)
+        # Quitamos espacios dobles y espacios en los extremos
+        return ' '.join(texto.split()).strip()
+        
+    async def sincronizar_nombre_acestream(self, channel):
+        """
+        Consulta la API de Ace Stream y actualiza el nombre en DB si ha cambiado.
+        """
+        params = {
+            "api_version": "3",
+            "method": "get_media_files",
+            "content_id": channel.id
+        }
+        
+        base_url = self.config.ace_engine_url.rstrip('/')
+        url = f"{base_url}/server/api"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, timeout=5) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        # Extraemos el nombre que viene en el 'result'
+                        result = data.get('result', {})
+                        # Usamos 'name' que suele ser el campo más completo en el JSON de Ace Stream
+                        files = result.get('files', [])
+                        raw_name = result.get('name') or (files[0].get('filename', '') if files else '')
+                        
+                        if raw_name:
+                            nombre_final = self.limpiar_basico(raw_name)
+                            
+                            # Si el nombre detectado es distinto al de la DB, actualizamos YA
+                            if channel.name != nombre_final:
+                                self.logger.info(f"Metadata Update [{channel.id}]: {channel.name} -> {nombre_final}")
+                                channel.name = nombre_final
+        
+        except Exception as e:
+            self.logger.info(f"Error querying API for {channel.id}: {e}")
 
     async def start(self):
         """Main task loop."""
