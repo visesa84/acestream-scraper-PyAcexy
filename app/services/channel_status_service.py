@@ -4,6 +4,7 @@ import aiohttp
 import threading
 from datetime import datetime
 from typing import Optional, List, Union, Dict, Any
+from ..tasks.channel_vision_manager import ChannelVisionManager
 from ..models import AcestreamChannel
 from ..extensions import db
 from ..utils.config import Config
@@ -17,7 +18,7 @@ class ChannelStatusService:
         self.ace_engine_url = config.ace_engine_url 
         # Puerto 8080: Para saber si tú estás viendo el canal
         self.proxy_url = "/".join(config.base_url.split("/")[:3])
-        
+        self.vision = ChannelVisionManager()
         self.timeout = aiohttp.ClientTimeout(total=5, connect=2)
         self._session = None
 
@@ -32,7 +33,6 @@ class ChannelStatusService:
 
     async def check_channel(self, channel_id: str) -> bool:
         from flask import current_app
-        from app import db
         
         session = await self.get_session()
         if not session:
@@ -42,9 +42,12 @@ class ChannelStatusService:
         is_online = False
         is_already_watching = False
         command_url = None
+        stream_url = None
         download_speed = 0
         error_msg = "Unknown error"
         check_time = datetime.now()
+        nombre_ia = None
+        channel_data = None
         
         try:
             # 1. PROXY
@@ -87,6 +90,19 @@ class ChannelStatusService:
                     else:
                         error_msg = data.get('error', "No stat_url")
 
+            if is_online:
+                # Usamos el contexto para obtener el objeto canal antes de la IA
+                with current_app.app_context():
+                    db_channel = db.session.get(AcestreamChannel, channel_id)
+                    if db_channel:
+                        channel_data = {
+                            'id': db_channel.id,
+                            'logo': db_channel.logo
+                        }
+                # Ejecutamos la verificación visual completa
+                stream_url = f"{self.ace_engine_url}/ace/getstream?id={channel_id}"
+                nombre_ia = await self.vision.procesar_verificacion_completa(channel_data, stream_url)
+                        
         except Exception as e:
             logger.error(f"Error checking {channel_id}: {e}")
             error_msg = str(e)
@@ -104,12 +120,25 @@ class ChannelStatusService:
             with current_app.app_context():
                 db_channel = db.session.get(AcestreamChannel, channel_id)
                 if db_channel:
+                    # Guardamos el nombre antiguo para comparar
+                    nombre_antiguo = db_channel.name
+
                     db_channel.is_online = is_online
                     db_channel.last_processed = check_time
                     db_channel.last_checked = check_time
-                    db_channel.check_error = None if is_online else error_msg
-                    db.session.commit()
+                    if is_online:
+                        db_channel.check_error = None
+                        # Si la IA reconoció el logo, actualizamos nombre
+                        if nombre_ia and str(nombre_ia).strip() != "None":
+                            if nombre_antiguo != nombre_ia:
+                                db_channel.name = nombre_ia
+                                logger.info(f"[IA] ID: {channel_id} | '{nombre_antiguo}' -> '{nombre_ia}'")
+                    else:
+                        db_channel.check_error = error_msg
+                        
                     logger.info(f"[{'ONLINE' if is_online else 'OFFLINE'}] {channel_id} | {download_speed} KB/s")
+                    db.session.commit()
+                    
         except Exception as db_e:
             logger.error(f"DB Error: {db_e}")
             
@@ -237,14 +266,6 @@ def start_background_check(channels, manager=None):
                     if batch:
                         logger.info(f"Processing pair: {i+1}-{min(i+batch_size, total)} of {total}")
                         await service.check_channels(batch)
-                        
-                        # Sincronizacion de nombres (Solo para los que están vivos)
-                        if manager:
-                            for canal in batch:
-                                canal = db.session.merge(canal, load=False)
-                                # Si el check dio positivo
-                                if getattr(canal, 'is_online', False):
-                                    await manager.sincronizar_nombre_acestream(canal)
                         
                         db.session.commit()
                         db.session.expunge_all() # Saca los objetos de la RAM

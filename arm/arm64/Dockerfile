@@ -11,12 +11,12 @@ RUN sed -i 's/\[dependencies\]/\[dependencies\]\ntime = "=0.3.36"\ntime-core = "
 
 RUN cargo install --path boringtun-cli
 
-# --- STAGE 1: Base image con todas las dependencias (Alpine 3.21) ---
+# --- STAGE 1: Base image con todas las dependencias ---
 FROM --platform=linux/arm64 python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Acestream channel scraper with ZeroNet support" \
-      version="3.5"
+      version="3.6"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y \
     tor git lsb-release apt-transport-https ca-certificates \
     wireguard-tools iproute2 ffmpeg \
 	openresolv unzip binutils \
+	libsm6 libxext6 libglib2.0-0 libgl1 libatlas-base-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Configuración de TOR
@@ -43,7 +44,7 @@ RUN pip install --no-cache-dir \
     "msgpack-python" "gevent==22.10.2" "PySocks" "gevent-websocket" \
     "python-bitcoinlib" "bencode.py" "merkletools" "pysha3" \
     "cgi-tools" "urllib3<2.0.0" "rich" "requests" "pyaes" \
-    "coincurve" "base58" "defusedxml" "rsa" "psutil"
+    "coincurve" "base58" "defusedxml" "rsa" "psutil" "opencv-python-headless"
 
 # --- INSTALACIÓN DE PYACEXY ---
 COPY pyacexy/ /opt/pyacexy/
