@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y \
     tor git lsb-release apt-transport-https ca-certificates \
     wireguard-tools iproute2 ffmpeg \
 	openresolv unzip binutils \
-	libsm6 libxext6 libglib2.0-0 libgl1 libatlas-base-dev \
+	libsm6 libxext6 libglib2.0-0 libopenblas-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Configuración de TOR

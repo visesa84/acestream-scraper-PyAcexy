@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y \
     wireguard-tools iproute2 ffmpeg \
 	openresolv unzip binutils \
 	gcc libssl-dev libffi-dev \
-	libsm6 libxext6 libglib2.0-0 libgl1 libatlas-base-dev gfortran \
+	libsm6 libxext6 libglib2.0-0 libopenblas-dev gfortran \
 	libsecp256k1-dev libtool autoconf automake pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
