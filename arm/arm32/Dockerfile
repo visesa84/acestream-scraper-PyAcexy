@@ -27,17 +27,17 @@ RUN echo -e '#!/bin/bash\n/usr/local/bin/boringtun-real --disable-drop-privilege
     chmod +x /usr/local/bin/boringtun /usr/local/bin/boringtun-real
 	
 # Instalar dependencias del sistema + herramientas de WireGuard
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     wget curl gnupg gcc python3-dev build-essential \
-    tor git apt-transport-https ca-certificates \
+    tor git lsb-release apt-transport-https ca-certificates \
     wireguard-tools iproute2 ffmpeg \
-    openresolv unzip binutils \
-    libssl-dev libffi-dev \
-    libsecp256k1-dev libtool autoconf automake pkg-config \
+	openresolv unzip binutils \
+	gcc libssl-dev libffi-dev \
+	libsecp256k1-dev libtool autoconf automake pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0 \
+    libglib2.0-0* \
     && rm -rf /var/lib/apt/lists/*
 
 # Configuración de TOR
