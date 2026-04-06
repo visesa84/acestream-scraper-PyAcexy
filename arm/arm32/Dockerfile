@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openresolv unzip binutils \
     libssl-dev libffi-dev \
     libsecp256k1-dev libtool autoconf automake pkg-config \
-    libsm6 libxext6 libglib2.0-0 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
