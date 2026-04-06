@@ -38,7 +38,7 @@ RUN apt-get update && apt-get install -y \
     tor git lsb-release apt-transport-https ca-certificates \
     wireguard-tools iproute2 \
 	openresolv \
-	libsm6 libxext6 libglib2.0-0 \
+	libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Configuración de TOR

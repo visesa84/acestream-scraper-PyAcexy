@@ -31,7 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl gnupg gcc python3-dev build-essential \
     tor git lsb-release apt-transport-https ca-certificates \
     wireguard-tools iproute2 ffmpeg openresolv unzip binutils \
-    libssl-dev libffi-dev libsm6 libxext6 libglib2.0-0 \
+    libssl-dev libffi-dev libglib2.0-0 \
     libopenblas-dev libsecp256k1-dev libtool autoconf automake pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
