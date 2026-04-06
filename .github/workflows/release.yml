@@ -60,7 +60,6 @@ jobs:
           file: ./arm/arm32/Dockerfile
           platforms: linux/arm/v7
           push: true
-          provenance: false 
           tags: ${{ env.IMAGE_NAME }}:temp-armv7
           cache-from: type=gha,scope=armv7
           cache-to: type=gha,mode=max,scope=armv7
@@ -78,7 +77,6 @@ jobs:
 
       # 3. LIMPIEZA DE TAGS TEMPORALES
       - name: Delete temp tags from Docker Hub
-        if: always()
         run: |
           # 1. Obtener el token de acceso usando el endpoint de login correcto
           TOKEN=$(curl -s -H "Content-Type: application/json" \
@@ -94,16 +92,10 @@ jobs:
 
           # Borrar cada tag temporal usando la URL de la API de repositorios
           for TAG in temp-amd64 temp-arm64 temp-armv7; do
-            echo "Intentando borrar tag: $TAG..."
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+            echo "Borrando tag: $TAG..."
+            curl -s -X DELETE \
               -H "Authorization: JWT ${TOKEN}" \
-              "https://hub.docker.com/v2/repositories/${{ env.IMAGE_NAME }}/tags/${TAG}/")
-            
-            if [ "$HTTP_CODE" == "204" ]; then
-              echo "Tag $TAG borrado con éxito."
-            else
-              echo "Tag $TAG no encontrado o error al borrar (Código: $HTTP_CODE). Saltando..."
-            fi
+              "https://hub.docker.com/v2/repositories/${{ env.IMAGE_NAME }}/tags/${TAG}/"
           done
 
       # --- PASO PREVIO AL RELEASE ---
