@@ -71,7 +71,7 @@ RUN pip install --no-cache-dir \
     --index-url https://pypi.org/simple \
     --extra-index-url https://www.piwheels.org/simple \
     --prefer-binary \
-    "opencv-python-headless" "psutil" "pysha3" "gevent-websocket"
+    "opencv-python-headless<4.11" "psutil" "pysha3" "gevent-websocket"
 
 # Luego el resto de librerías más ligeras
 RUN pip install --no-cache-dir \
