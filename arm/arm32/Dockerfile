@@ -68,9 +68,9 @@ RUN COINCURVE_IGNORE_SYSTEM_LIB=0 \
 	
 # Instalamos primero las que más tardan en compilar usando Piwheels
 RUN pip install --no-cache-dir \
-    --index-url https://pypi.org/simple \
-    --extra-index-url https://www.piwheels.org/simple \
-    --prefer-binary \
+    --index-url https://www.piwheels.org/simple \
+    --extra-index-url https://pypi.org/simple \
+    --only-binary=:all: \
     "opencv-python-headless<4.11" "psutil" "pysha3" "gevent-websocket"
 
 # Luego el resto de librerías más ligeras
