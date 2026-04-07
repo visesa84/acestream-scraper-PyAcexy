@@ -36,7 +36,9 @@ RUN apt-get update && apt-get install -y \
 	libsecp256k1-dev libtool autoconf automake pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
+# Instalamos OpenCV desde los repositorios oficiales de Debian
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-opencv \
     libglib2.0-0* \
     && rm -rf /var/lib/apt/lists/*
 
@@ -67,16 +69,8 @@ RUN COINCURVE_IGNORE_SYSTEM_LIB=0 \
     --extra-index-url https://www.piwheels.org/simple \
     --prefer-binary \
     "coincurve==18.0.0"
-	
 
-# Busca la mejor versión disponible en binario
-RUN pip install --no-cache-dir \
-    --index-url https://www.piwheels.org/simple \
-    --only-binary=:all: \
-    opencv-python-headless || \
-    pip install --no-cache-dir opencv-python-headless==4.6.0.66
-
-# 3. El resto de librerías (permitimos que compilen si es necesario, son rápidas)
+# El resto de librerías por PIP (sin OpenCV)
 RUN pip install --no-cache-dir \
     --extra-index-url https://www.piwheels.org/simple \
     --prefer-binary \
