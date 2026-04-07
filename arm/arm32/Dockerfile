@@ -57,12 +57,21 @@ RUN pip install --no-cache-dir "cffi>=1.15.0"
 RUN COINCURVE_IGNORE_SYSTEM_LIB=0 \
     pip install --no-cache-dir --no-build-isolation "coincurve==18.0.0"
 	
-# Instalar librerías de Python
+# Instalamos primero las que más tardan en compilar usando Piwheels
 RUN pip install --no-cache-dir \
-    "msgpack-python" "PySocks" "gevent-websocket" \
-    "python-bitcoinlib" "bencode.py" "merkletools" "pysha3" \
-    "cgi-tools" "urllib3<2.0.0" "rich" "requests" "pyaes" \
-    "base58" "defusedxml" "rsa" "psutil" "opencv-python-headless"
+    --index-url https://pypi.org/simple \
+    --extra-index-url https://www.piwheels.org/simple \
+    --prefer-binary \
+    "opencv-python-headless" "psutil" "pysha3" "gevent-websocket"
+
+# Luego el resto de librerías más ligeras
+RUN pip install --no-cache-dir \
+    --index-url https://pypi.org/simple \
+    --extra-index-url https://www.piwheels.org/simple \
+    "msgpack-python" "PySocks" "python-bitcoinlib" \
+    "bencode.py" "merkletools" "cgi-tools" \
+    "urllib3<2.0.0" "rich" "requests" "pyaes" \
+    "base58" "defusedxml" "rsa"
 
 # --- INSTALACIÓN DE PYACEXY ---
 COPY pyacexy/ /opt/pyacexy/
