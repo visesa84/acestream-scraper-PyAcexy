@@ -44,18 +44,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN echo "ControlPort 9051" >> /etc/tor/torrc && \
     echo "CookieAuthentication 1" >> /etc/tor/torrc
 
-# Forzar Cython antiguo
-RUN pip install --no-cache-dir "setuptools<61.0.0" "wheel" "Cython<3.0" "cffi>=1.15.0"
+# 1. Instalamos las herramientas de construcción primero (siempre con piwheels por si acaso)
+RUN pip install --no-cache-dir \
+    --index-url https://pypi.org/simple \
+    --extra-index-url https://www.piwheels.org/simple \
+    --prefer-binary \
+    "setuptools<61.0.0" "wheel" "Cython<3.0" "cffi>=1.15.0"
+
+# 2. Instalamos gevent y pysha3 (Aquí piwheels te salvará la vida)
 RUN pip install --no-cache-dir --no-build-isolation \
-    "gevent==22.10.2" \
-    "pysha3"
+    --index-url https://pypi.org/simple \
+    --extra-index-url https://www.piwheels.org/simple \
+    --prefer-binary \
+    "gevent==22.10.2" "pysha3"
 
-# Asegúrate de tener cffi instalado antes
-RUN pip install --no-cache-dir "cffi>=1.15.0"
-
-# Instalar coincurve
+# 3. Instalar coincurve (Forzando el uso de la librería del sistema que instalamos por apt)
 RUN COINCURVE_IGNORE_SYSTEM_LIB=0 \
-    pip install --no-cache-dir --no-build-isolation "coincurve==18.0.0"
+    pip install --no-cache-dir --no-build-isolation \
+    --index-url https://pypi.org/simple \
+    --extra-index-url https://www.piwheels.org/simple \
+    --prefer-binary \
+    "coincurve==18.0.0"
 	
 # Instalamos primero las que más tardan en compilar usando Piwheels
 RUN pip install --no-cache-dir \
