@@ -45,6 +45,8 @@ RUN echo "ControlPort 9051" >> /etc/tor/torrc && \
     echo "CookieAuthentication 1" >> /etc/tor/torrc
 
 # 1. Instalamos las herramientas de construcción primero (siempre con piwheels por si acaso)
+RUN pip install --no-cache-dir wheel
+
 RUN pip install --no-cache-dir \
     --index-url https://pypi.org/simple \
     --extra-index-url https://www.piwheels.org/simple \
@@ -66,21 +68,21 @@ RUN COINCURVE_IGNORE_SYSTEM_LIB=0 \
     --prefer-binary \
     "coincurve==18.0.0"
 	
-# Instalamos primero las que más tardan en compilar usando Piwheels
+
+# Busca la mejor versión disponible en binario
 RUN pip install --no-cache-dir \
     --index-url https://www.piwheels.org/simple \
-    --extra-index-url https://pypi.org/simple \
     --only-binary=:all: \
-    "opencv-python-headless<4.11" "psutil" "pysha3" "gevent-websocket"
+    opencv-python-headless || \
+    pip install --no-cache-dir opencv-python-headless==4.6.0.66
 
-# Luego el resto de librerías más ligeras
+# 3. El resto de librerías (permitimos que compilen si es necesario, son rápidas)
 RUN pip install --no-cache-dir \
-    --index-url https://pypi.org/simple \
     --extra-index-url https://www.piwheels.org/simple \
-    "msgpack-python" "PySocks" "python-bitcoinlib" \
-    "bencode.py" "merkletools" "cgi-tools" \
-    "urllib3<2.0.0" "rich" "requests" "pyaes" \
-    "base58" "defusedxml" "rsa"
+    --prefer-binary \
+    "psutil" "pysha3" "gevent-websocket" "msgpack-python" "PySocks" \
+    "python-bitcoinlib" "bencode.py" "merkletools" "cgi-tools" \
+    "urllib3<2.0.0" "rich" "requests" "pyaes" "base58" "defusedxml" "rsa"
 
 # --- INSTALACIÓN DE PYACEXY ---
 COPY pyacexy/ /opt/pyacexy/
