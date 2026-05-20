@@ -16,7 +16,7 @@ FROM --platform=linux/arm64 python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Acestream channel scraper with ZeroNet support" \
-      version="3.6"
+      version="3.7"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -44,7 +44,7 @@ RUN pip install --no-cache-dir \
     "msgpack-python" "gevent==22.10.2" "PySocks" "gevent-websocket" \
     "python-bitcoinlib" "bencode.py" "merkletools" "pysha3" \
     "cgi-tools" "urllib3<2.0.0" "rich" "requests" "pyaes" \
-    "coincurve" "base58" "defusedxml" "rsa" "psutil" "opencv-python-headless"
+    "coincurve" "base58" "defusedxml" "rsa" "psutil"
 
 # --- INSTALACIÓN DE PYACEXY ---
 COPY pyacexy/ /opt/pyacexy/

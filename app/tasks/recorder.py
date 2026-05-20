@@ -2,10 +2,99 @@ import os
 import subprocess
 import psutil
 import re
+import threading
+import shutil
 from datetime import datetime
 from app.extensions import db
 from app.models import RecordingSchedule, EPGProgram, TVChannel, AcestreamChannel, Setting
 
+def background_conversion(app, input_path, output_path, rec_id):
+    """Función que corre en segundo plano para no bloquear el bucle principal"""
+    with app.app_context():
+        
+        try:
+            # Llamamos a tu función de limpieza
+            eliminar_fragmentos_congelados(input_path, output_path)
+            
+            # Borramos el original si el resultado existe
+            if os.path.exists(output_path):
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                
+                # Actualizamos la base de datos desde aquí
+                rec = RecordingSchedule.query.get(rec_id)
+                if rec:
+                    rec.status = 'completed'
+                    db.session.commit()
+                app.logger.info(f"[CONVERTER] Completed successfully: {output_path}")
+            
+        except Exception as e:
+            print(f"Error in conversion thread: {e}")
+            # Si falla, marcamos como failed
+            rec = RecordingSchedule.query.get(rec_id)
+            if rec:
+                rec.status = 'failed'
+                db.session.commit()
+                
+def eliminar_fragmentos_congelados(video_input, video_output, ruido="-60db", duracion_minima="2"):
+    print("Analyzing the video for frozen fragments...")
+    
+    # 1. Ejecutar freezedetect y capturar la salida de texto (stderr)
+    comando_detectar = f'ffmpeg -i "{video_input}" -vf freezedetect=n={ruido}:d={duracion_minima} -f null -'
+    
+    proceso = subprocess.run(comando_detectar, stderr=subprocess.PIPE, text=True, encoding="utf-8", shell=True)
+    log_output = proceso.stderr
+
+    # 2. Buscar la duración total del video para el fragmento final
+    match_duracion = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", log_output)
+    if not match_duracion:
+        print("The duration of the video could not be determined.")
+        return
+    
+    horas, minutos, segundos = map(float, match_duracion.groups())
+    duracion_total = horas * 3600 + minutos * 60 + segundos
+
+    # 3. Extraer todos los tiempos de freeze_start y freeze_end
+    starts = [float(x) for x in re.findall(r"freeze_start:\s*([0-9.]+)", log_output)]
+    ends = [float(x) for x in re.findall(r"freeze_end:\s*([0-9.]+)", log_output)]
+
+    if not starts:
+        print("Perfect! No frozen fragments were detected. No need to cut.")
+        # Simplemente movemos el archivo original al nombre de salida
+        # para que el resto del flujo (borrado del original) funcione igual.
+        shutil.move(video_input, video_output)
+        return
+
+    print(f"{len(starts)} frozen fragments were detected. Calculating cuts...")
+
+    # 4. Construir las reglas de selección (partes limpias a conservar)
+    filtros_retencion = []
+    inicio_bueno = 0.0
+    
+    # Asegurarse de que tenemos la misma cantidad de inicios y finales
+    # Si falta un 'end', asumimos que el video termina en el último frame
+    if len(starts) > len(ends):
+        ends.append(duracion_total)
+    
+    for start, end in zip(starts, ends):
+        # Guardar el fragmento limpio que va desde el fin del último congelado hasta el inicio de este
+        filtros_retencion.append(f"between(t,{inicio_bueno},{start})")
+        inicio_bueno = end
+
+    # Añadir el último fragmento limpio desde el último congelado hasta el final del video
+    if inicio_bueno < duracion_total:
+        filtros_retencion.append(f"between(t,{inicio_bueno},{duracion_total})")
+
+    # Unir todos los fragmentos con el signo '+' exigido por FFmpeg
+    filtro_final = "+".join(filtros_retencion)
+
+    # 5. Configurar y lanzar el comando de corte final
+    print("Processing and exporting the clean video (re-encoding)...")
+    comando_cortar = f'ffmpeg -y -i "{video_input}" -vf select="{filtro_final}",setpts=N/FRAME_RATE/TB -af aselect="{filtro_final}",asetpts=N/SR/TB -c:v libx264 -preset superfast -c:a aac "{video_output}"'
+
+    subprocess.run(comando_cortar, shell=True)
+    print(f"Process completed successfully! File saved as: {video_output}")
+    
 def process_recordings(app, single_program_id=None):
     """
     Motor de grabación:
@@ -67,12 +156,20 @@ def process_recordings(app, single_program_id=None):
                         for ts_file in parts_ts:
                             input_path = os.path.join(save_path, ts_file)
                             output_path = input_path.replace('.ts', '.mp4')
-                
-                            cmd_conv = f'ffmpeg -y -i "{input_path}" -c copy -movflags +faststart -nostdin "{output_path}"'
+                            
+                            #cmd_conv = f'ffmpeg -y -i "{input_path}" -c copy -movflags +faststart -nostdin "{output_path}"'
                             try:
-                                subprocess.run(cmd_conv, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                                if os.path.exists(output_path):
-                                    os.remove(input_path)
+                                conv_thread = threading.Thread(
+                                    target=background_conversion, 
+                                    args=(app, input_path, output_path, rec.id)
+                                )
+                                conv_thread.start()
+
+                                app.logger.info(f"[CONVERTER] Background task started for: {prog.title}")
+                                #eliminar_fragmentos_congelados(input_path, output_path)
+                                #subprocess.run(cmd_conv, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                                #if os.path.exists(output_path):
+                                #    os.remove(input_path)
                             except Exception as e:
                                 app.logger.error(f"Error converting recording for {prog.id}: {e}")
                         

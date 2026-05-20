@@ -16,7 +16,7 @@ FROM --platform=linux/arm/v7 python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Acestream channel scraper with ZeroNet support" \
-      version="3.6"
+      version="3.7"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -27,7 +27,7 @@ RUN echo -e '#!/bin/bash\n/usr/local/bin/boringtun-real --disable-drop-privilege
     chmod +x /usr/local/bin/boringtun /usr/local/bin/boringtun-real
 	
 # Instalar dependencias del sistema + herramientas de WireGuard
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl gnupg gcc python3-dev build-essential \
     tor git lsb-release apt-transport-https ca-certificates \
     wireguard-tools iproute2 ffmpeg \
@@ -36,9 +36,7 @@ RUN apt-get update && apt-get install -y \
 	libsecp256k1-dev libtool autoconf automake pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalamos OpenCV desde los repositorios oficiales de Debian
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-opencv \
     libglib2.0-0* \
     && rm -rf /var/lib/apt/lists/*
 
@@ -70,7 +68,7 @@ RUN COINCURVE_IGNORE_SYSTEM_LIB=0 \
     --prefer-binary \
     "coincurve==18.0.0"
 
-# El resto de librerías por PIP (sin OpenCV)
+# El resto de librerías por PIP
 RUN pip install --no-cache-dir \
     --extra-index-url https://www.piwheels.org/simple \
     --prefer-binary \

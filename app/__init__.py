@@ -77,7 +77,7 @@ def create_app(test_config=None):
     # Inyectar el task_manager global en el módulo de vistas
     main_module.task_manager = task_manager
     app.register_blueprint(main_blueprint)
-
+    
     # 4. Inicialización con Contexto de Aplicación
     is_testing = test_config == 'testing' or os.environ.get('TESTING') == '1'
     app.config['TESTING'] = is_testing

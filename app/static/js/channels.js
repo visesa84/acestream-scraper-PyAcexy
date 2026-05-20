@@ -311,7 +311,7 @@ async function editChannel(channelId) {
         document.getElementById('editChannelTvgId').value = channel.tvg_id || '';
         document.getElementById('editChannelTvgName').value = channel.tvg_name || '';
         document.getElementById('editChannelOriginalUrl').value = channel.original_url || '';
-        document.getElementById('editChannelM3uSource').value = channel.m3u_source || '';
+        document.getElementById('editChannelM3uSource').value = channel.source_url || '';
         const epgLockedField = document.getElementById('editChannelEpgLocked');
         if (epgLockedField) {
             epgLockedField.checked = Boolean(channel.epg_update_protected || false);

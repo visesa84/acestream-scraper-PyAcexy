@@ -4,7 +4,6 @@ import aiohttp
 import threading
 from datetime import datetime
 from typing import Optional, List, Union, Dict, Any
-from ..tasks.channel_vision_manager import ChannelVisionManager
 from ..models import AcestreamChannel
 from ..extensions import db
 from ..utils.config import Config
@@ -18,7 +17,6 @@ class ChannelStatusService:
         self.ace_engine_url = config.ace_engine_url 
         # Puerto 8080: Para saber si tú estás viendo el canal
         self.proxy_url = "/".join(config.base_url.split("/")[:3])
-        self.vision = ChannelVisionManager()
         self.timeout = aiohttp.ClientTimeout(total=5, connect=2)
         self._session = None
 
@@ -89,19 +87,6 @@ class ChannelStatusService:
                             error_msg = f"Speed 0 after {attempt+1} attempts"
                     else:
                         error_msg = data.get('error', "No stat_url")
-
-            if is_online:
-                # Usamos el contexto para obtener el objeto canal antes de la IA
-                with current_app.app_context():
-                    db_channel = db.session.get(AcestreamChannel, channel_id)
-                    if db_channel:
-                        channel_data = {
-                            'id': db_channel.id,
-                            'logo': db_channel.logo
-                        }
-                # Ejecutamos la verificación visual completa
-                stream_url = f"{self.ace_engine_url}/ace/getstream?id={channel_id}"
-                nombre_ia = await self.vision.procesar_verificacion_completa(channel_data, stream_url)
                         
         except Exception as e:
             logger.error(f"Error checking {channel_id}: {e}")
@@ -128,6 +113,11 @@ class ChannelStatusService:
                     db_channel.last_checked = check_time
                     if is_online:
                         db_channel.check_error = None
+                        # Si la IA modificó el diccionario channel_data
+                        if channel_data and 'logo' in channel_data:
+                            if db_channel.logo != channel_data['logo']:
+                                db_channel.logo = channel_data['logo']
+                                logger.info(f"[IA] Logo updated in DB to: {db_channel.logo}")
                         # Si la IA reconoció el logo, actualizamos nombre
                         if nombre_ia and str(nombre_ia).strip() != "None":
                             if nombre_antiguo != nombre_ia:

@@ -16,7 +16,7 @@ FROM python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Base image for Acestream channel scraper with pyacexy" \
-      version="3.6"
+      version="3.7"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -33,7 +33,7 @@ RUN echo '#!/bin/bash\n/usr/local/bin/boringtun-real --disable-drop-privileges "
     chmod +x /usr/local/bin/boringtun
 
 # Instalar dependencias del sistema + herramientas de WireGuard
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl gnupg gcc python3-dev build-essential \
     tor git lsb-release apt-transport-https ca-certificates \
     wireguard-tools iproute2 \
@@ -64,7 +64,6 @@ RUN pip install --no-cache-dir \
     "base58" \
     "defusedxml" \
     "rsa" \
-	"opencv-python-headless" \
 	"psutil"
 
 # --- INSTALACIÓN DE PYACEXY ---
@@ -144,7 +143,7 @@ FROM base
 
 # Update metadata labels for the final image
 LABEL description="Acestream channel scraper with ZeroNet support" \
-      version="3.6"
+      version="3.7"
 
 # Copy application files
 COPY --chmod=0755 entrypoint.sh /app/entrypoint.sh
