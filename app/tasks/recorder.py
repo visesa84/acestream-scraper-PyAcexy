@@ -157,7 +157,6 @@ def process_recordings(app, single_program_id=None):
                             input_path = os.path.join(save_path, ts_file)
                             output_path = input_path.replace('.ts', '.mp4')
                             
-                            #cmd_conv = f'ffmpeg -y -i "{input_path}" -c copy -movflags +faststart -nostdin "{output_path}"'
                             try:
                                 conv_thread = threading.Thread(
                                     target=background_conversion, 
@@ -166,10 +165,7 @@ def process_recordings(app, single_program_id=None):
                                 conv_thread.start()
 
                                 app.logger.info(f"[CONVERTER] Background task started for: {prog.title}")
-                                #eliminar_fragmentos_congelados(input_path, output_path)
-                                #subprocess.run(cmd_conv, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                                #if os.path.exists(output_path):
-                                #    os.remove(input_path)
+
                             except Exception as e:
                                 app.logger.error(f"Error converting recording for {prog.id}: {e}")
                         

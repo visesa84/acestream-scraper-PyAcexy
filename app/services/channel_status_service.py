@@ -44,8 +44,6 @@ class ChannelStatusService:
         download_speed = 0
         error_msg = "Unknown error"
         check_time = datetime.now()
-        nombre_ia = None
-        channel_data = None
         
         try:
             # 1. PROXY
@@ -105,24 +103,12 @@ class ChannelStatusService:
             with current_app.app_context():
                 db_channel = db.session.get(AcestreamChannel, channel_id)
                 if db_channel:
-                    # Guardamos el nombre antiguo para comparar
-                    nombre_antiguo = db_channel.name
 
                     db_channel.is_online = is_online
                     db_channel.last_processed = check_time
                     db_channel.last_checked = check_time
                     if is_online:
                         db_channel.check_error = None
-                        # Si la IA modificó el diccionario channel_data
-                        if channel_data and 'logo' in channel_data:
-                            if db_channel.logo != channel_data['logo']:
-                                db_channel.logo = channel_data['logo']
-                                logger.info(f"[IA] Logo updated in DB to: {db_channel.logo}")
-                        # Si la IA reconoció el logo, actualizamos nombre
-                        if nombre_ia and str(nombre_ia).strip() != "None":
-                            if nombre_antiguo != nombre_ia:
-                                db_channel.name = nombre_ia
-                                logger.info(f"[IA] ID: {channel_id} | '{nombre_antiguo}' -> '{nombre_ia}'")
                     else:
                         db_channel.check_error = error_msg
                         

@@ -70,7 +70,7 @@ class EPGRefreshWorker:
             # Llamamos directamente a fetch, saltándonos el should_refresh_epg del service
             epg_data = self.epg_service.fetch_epg_data(source_url)
             if epg_data is None:
-                logger.error("El Service devolvió None. Revisa la conexión o la URL.")
+                logger.error("The service returned None. Check the connection or the URL.")
                 return 0
             
             await self.cleanup_old_programs()

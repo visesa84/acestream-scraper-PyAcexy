@@ -16,8 +16,26 @@ $LOG_DIR/*.log {
 }
 EOF
 
+echo "Starting cron daemon..."
+cron || true
+
 # Run logrotate once to ensure config is valid
-logrotate /etc/logrotate.d/acestream-services --debug
+logrotate /etc/logrotate.d/acestream-services --debug || true
+
+# Preparamos las variables de control de procesos
+ACESTREAM_PID=""
+PYACEXY_PID=""
+ZERONET_PID=""
+GUNICORN_PID=""
+
+# TRAP POSICIONADO AL PRINCIPIO: Asegura una salida limpia de TODOS los servicios
+cleanup() {
+    echo "Stopping all services cleanly..."
+    # Matamos solo los PIDs que se hayan llegado a inicializar
+    kill -TERM $GUNICORN_PID $ZERONET_PID $PYACEXY_PID $ACESTREAM_PID 2>/dev/null || true
+    exit 0
+}
+trap cleanup INT TERM EXIT
 
 # Initialize WARP if enabled
 if [ "${ENABLE_WARP}" = "true" ]; then
@@ -69,7 +87,8 @@ if [ "$ENABLE_ACESTREAM_ENGINE" = "true" ]; then
     echo "Starting Acestream engine..."
 	# Limpiar posibles comillas literales que hayan quedado en la variable
 	EXTRA_FLAGS=$(echo $EXTRA_FLAGS | sed 's/"//g')
-    /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream.log" 2>&1 &  
+    /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream.log" 2>&1 & 
+	ACESTREAM_PID=$!	
     sleep 3 # Brief pause to allow Acestream engine to start
     echo "Acestream engine logs available at $LOG_DIR/acestream.log"
 fi
@@ -85,6 +104,7 @@ if [ "$ENABLE_ACEXY" = "true" ]; then
     export ACEXY_HOST
     export ACEXY_PORT
     python /usr/local/bin/pyacexy >> "$LOG_DIR/pyacexy.log" 2>&1 &
+	PYACEXY_PID=$!
     echo "PyAcexy proxy logs available at $LOG_DIR/pyacexy.log"
 else
     echo "PyAcexy is disabled."
@@ -116,8 +136,6 @@ gunicorn --bind "0.0.0.0:$FLASK_PORT" \
 GUNICORN_PID=$!
 
 echo "Services started. Monitoring processes..."
-# El trap ahora sí funcionará para limpiar todo al cerrar el contenedor
-trap "kill $GUNICORN_PID $ZERONET_PID; exit" INT TERM EXIT
 
 # Mantenemos el contenedor vivo monitorizando gunicorn
 wait $GUNICORN_PID

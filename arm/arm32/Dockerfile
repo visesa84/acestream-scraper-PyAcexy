@@ -16,7 +16,7 @@ FROM --platform=linux/arm/v7 python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Acestream channel scraper with ZeroNet support" \
-      version="3.7"
+      version="3.8"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -32,12 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tor git lsb-release apt-transport-https ca-certificates \
     wireguard-tools iproute2 ffmpeg \
 	openresolv unzip binutils \
-	gcc libssl-dev libffi-dev \
+	gcc libssl-dev libffi-dev logrotate cron \
 	libsecp256k1-dev libtool autoconf automake pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0* \
     && rm -rf /var/lib/apt/lists/*
 
 # Configuración de TOR
