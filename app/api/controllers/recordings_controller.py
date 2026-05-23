@@ -5,7 +5,7 @@ from flask_restx import Namespace, Resource, fields
 from app import db
 from app.repositories.epg_program_repository import EPGProgramRepository
 from app.models import RecordingSchedule, EPGProgram
-from app.tasks.recorder import start_recording_now, stop_recording_now
+from app.tasks.recorder import start_recording_now, stop_recording_now, disparar_conversion
 
 api = Namespace('recordings', description='Program recording operations')
 
@@ -18,6 +18,20 @@ recording_model = api.model('RecordingToggle', {
 # Definimos la ruta base de las grabaciones
 RECORDINGS_DIR = "/app/config/recordings"
 
+def _force_stop_ffmpeg_process(program_id: int) -> bool:
+    """Busca y termina procesos ffmpeg asociados a un program_id."""
+    killed = False
+    for proc in psutil.process_iter(['cmdline']):
+        try:
+            cmdline = " ".join(proc.info.get('cmdline') or [])
+            # Buscamos el tag específico que le pones a ffmpeg
+            if f"prog_id:{program_id}" in cmdline:
+                proc.terminate()
+                killed = True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    return killed
+    
 @api.route('/toggle')
 class RecordingToggle(Resource):
     @api.expect(recording_model)
@@ -111,8 +125,8 @@ class RecordingList(Resource):
             rec = schedules_map.get(program_id)
             
             # PRIORIDAD DE FECHAS: Schedule modificado > EPG Original
-            d_start = rec.start_time.isoformat() if (rec and rec.start_time) else (rec.program.start_time.isoformat() if rec else None)
-            d_end = rec.end_time.isoformat() if (rec and rec.end_time) else (rec.program.end_time.isoformat() if rec else None)
+            d_start = rec.start_time.isoformat() if rec.start_time else "N/A"
+            d_end = rec.end_time.isoformat() if rec.end_time else "N/A"
 
             # Lógica de estado de parte activa
             actual_status = 'completed'
@@ -144,8 +158,8 @@ class RecordingList(Resource):
         # 2) Añadir schedules sin archivo
         for rec in schedules:
             if rec.program_id not in [i['program_id'] for i in items]:
-                d_start = rec.start_time.isoformat() if rec.start_time else rec.program.start_time.isoformat()
-                d_end = rec.end_time.isoformat() if rec.end_time else rec.program.end_time.isoformat()
+                d_start = rec.start_time.isoformat() if rec.start_time else "N/A"
+                d_end = rec.end_time.isoformat() if rec.end_time else "N/A"
                 
                 items.append({
                     'filename': '',
@@ -162,28 +176,21 @@ class RecordingList(Resource):
 @api.route('/stop/<int:program_id>')
 class RecordingStop(Resource):
     def post(self, program_id):
-        """Detiene una grabación en curso buscando el proceso por el tag de prog_id."""
-        rec = RecordingSchedule.query.filter_by(program_id=program_id).first()
+        from flask import current_app
+        # 1. Matamos el proceso
+        process_killed = _force_stop_ffmpeg_process(program_id)
         
-        if rec and rec.status == 'recording':
-            rec.end_time = datetime.now()
-            for proc in psutil.process_iter(['cmdline']):
-                try:
-                    cmdline = " ".join(proc.info.get('cmdline') or [])
-                    if f"prog_id:{program_id}" in cmdline:
-                        proc.terminate()
-                except:
-                    pass
-
-            # Actualizar base de datos
+        # 2. Actualizamos DB
+        rec = RecordingSchedule.query.filter_by(program_id=program_id).first()
+        if rec:
+            rec.end_time = datetime.now() # Forzamos el fin
             db.session.commit()
             
-            return {
-                'message': 'Stopped successfully', 
-                'program_id': program_id
-            }, 200
+            # 3. Llamamos a nuestra nueva función reutilizable
+            disparar_conversion(current_app._get_current_object(), rec)
             
-        return {'message': 'Recording not found or not in progress'}, 404
+            return {'message': 'Recording stopped and conversion started'}, 200
+        return {'message': 'Recording not found'}, 404
 
 @api.route('/delete/<string:filename>')
 class RecordingDelete(Resource):

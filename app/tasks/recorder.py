@@ -90,11 +90,36 @@ def eliminar_fragmentos_congelados(video_input, video_output, ruido="-60db", dur
 
     # 5. Configurar y lanzar el comando de corte final
     print("Processing and exporting the clean video (re-encoding)...")
-    comando_cortar = f'ffmpeg -y -i "{video_input}" -vf select="{filtro_final}",setpts=N/FRAME_RATE/TB -af aselect="{filtro_final}",asetpts=N/SR/TB -c:v libx264 -preset superfast -c:a aac "{video_output}"'
+    comando_cortar = f'ffmpeg -y -i "{video_input}" -vf select="{filtro_final}",setpts=N/FRAME_RATE/TB -af aselect="{filtro_final}",asetpts=N/SR/TB -c:v libx264 -preset superfast -c:a aac -movflags +faststart "{video_output}"'
 
     subprocess.run(comando_cortar, shell=True)
     print(f"Process completed successfully! File saved as: {video_output}")
+
+def disparar_conversion(app, rec):
+    """Lógica que ya tenías dentro de process_recordings, ahora reutilizable."""
+    save_path = "/app/config/recordings"
+    prog = rec.program
+    clean_title = "".join([c for c in prog.title if c.isalnum() or c in (' ', '_')]).strip().replace(' ', '_')
     
+    parts_ts = [f for f in os.listdir(save_path) if f.startswith(f"{clean_title}_{prog.id}") and f.endswith('.ts')]
+    
+    if not parts_ts:
+        return False
+    
+    rec.status = 'converting'
+    db.session.commit()
+    
+    for ts_file in parts_ts:
+        input_path = os.path.join(save_path, ts_file)
+        output_path = input_path.replace('.ts', '.mp4')
+        
+        conv_thread = threading.Thread(
+            target=background_conversion, 
+            args=(app, input_path, output_path, rec.id)
+        )
+        conv_thread.start()
+    return True
+
 def process_recordings(app, single_program_id=None):
     """
     Motor de grabación:
@@ -147,32 +172,7 @@ def process_recordings(app, single_program_id=None):
             # SI EL TIEMPO PERSONALIZADO TERMINÓ
             if rec.end_time <= now:
                 if file_exists:
-                    total_size = sum(os.path.getsize(os.path.join(save_path, f)) for f in parts)
-                    if total_size > 0:
-                        parts_ts = [f for f in os.listdir(save_path) if f.startswith(f"{clean_title}_{prog.id}") and f.endswith('.ts')]
-                        rec.status = 'converting'
-                        db.session.commit()
-                        
-                        for ts_file in parts_ts:
-                            input_path = os.path.join(save_path, ts_file)
-                            output_path = input_path.replace('.ts', '.mp4')
-                            
-                            try:
-                                conv_thread = threading.Thread(
-                                    target=background_conversion, 
-                                    args=(app, input_path, output_path, rec.id)
-                                )
-                                conv_thread.start()
-
-                                app.logger.info(f"[CONVERTER] Background task started for: {prog.title}")
-
-                            except Exception as e:
-                                app.logger.error(f"Error converting recording for {prog.id}: {e}")
-                        
-                        rec.status = 'completed'
-                        app.logger.info(f"[CONVERTER] Successful: {prog.title} ID:{prog.id}")
-                    else:
-                        rec.status = 'failed'
+                    disparar_conversion(app, rec)
                 else:
                     rec.status = 'failed'
                 app.logger.info(f"[RECORDER] Finished: {prog.title} (Status: {rec.status})")

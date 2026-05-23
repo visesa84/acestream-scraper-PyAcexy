@@ -141,10 +141,11 @@ class EPGProgramRepository:
             logger.error(f"Error deleting program {program.id}: {str(e)}")
             return False
             
+    from app.models import EPGProgram # Asegúrate de tener esta importación
+
     def toggle_recording(self, program_id: int) -> Dict[str, Any]:
         """
-        Activa o desactiva una grabación.
-        Retorna un diccionario con el nuevo estado.
+        Activa o desactiva una grabación, capturando (snapshot) los tiempos actuales del EPG.
         """
         try:
             # Verificar si ya existe la grabación
@@ -156,10 +157,19 @@ class EPGProgramRepository:
                 db.session.commit()
                 return {'status': 'removed', 'program_id': program_id}
             else:
-                # Si no existe, la creamos
+                # BUSCAR EL PROGRAMA ACTUAL para obtener sus tiempos
+                prog = EPGProgram.query.filter_by(id=program_id).first()
+                
+                if not prog:
+                    raise ValueError(f"No se encontró el programa con ID {program_id} en el EPG.")
+
+                # GUARDAR LOS TIEMPOS (Snapshot)
+                # Al asignar start_time y end_time aquí, se quedan fijos en la tabla de grabaciones
                 new_recording = RecordingSchedule(
                     program_id=program_id,
-                    status='pending'
+                    status='pending',
+                    start_time=prog.start_time, # <--- SE GUARDA EL DATO FIJO
+                    end_time=prog.end_time      # <--- SE GUARDA EL DATO FIJO
                 )
                 db.session.add(new_recording)
                 db.session.commit()
