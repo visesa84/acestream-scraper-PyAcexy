@@ -372,11 +372,11 @@ class ChannelBatchStatusCheck(Resource):
                 }, 200
             
             # Start background check
-            result = start_background_check(channels)
+            start_background_check(channels)
             
             return {
                 'message': 'Channel status check initiated',
-                'total_channels': result['total_channels']
+                'total_channels': len(channels)
             }, 202
             
         except Exception as e:
