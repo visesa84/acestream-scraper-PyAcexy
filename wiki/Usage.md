@@ -211,3 +211,19 @@ To use WARP features:
 2. Navigate to the Configuration page
 3. Use the WARP controls to connect, disconnect, or change modes
 4. Optionally register a WARP+ or Team license for premium features
+
+## Environment Variables (Canonical Reference)
+
+Canonical environment variables for runtime configuration:
+
+| Variable | Default | Description |
+|---|---:|---|
+| `DOCKER_ENV` | (unset) | When set, container uses `/app/config` for config and DB. |
+| `ENABLE_ACEXY` | `true` | Enable PyAcexy proxy. |
+| `ACEXY_HOST` | `localhost` | Host/IP where PyAcexy connects to the engine. |
+| `ACEXY_PORT` | `6878` | Port of the Acestream Engine. |
+| `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. If `false`, entrypoint forces `CHECKSTATUS_ENABLED=false`. |
+| `ACESTREAM_HTTP_PORT` | `6878` | Main engine HTTP port; background-checker uses `6879` internally. |
+| `CHECKSTATUS_ENABLED` | `true` | Controls automatic stream checks; entrypoint may override based on engine settings. |
+
+Ensure these match your deployment topology (local engine vs external engine) so the app's health and check logic behave as expected.

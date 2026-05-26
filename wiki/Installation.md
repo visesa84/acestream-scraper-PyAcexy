@@ -45,7 +45,15 @@ Docker Compose provides the easiest way to get started with Acestream Scraper.
 		 - WARP_LICENSE_KEY=
 		 - ACESTREAM_HTTP_PORT=6878
 		 - ACESTREAM_HTTP_HOST=ACEXY_HOST
-		 - FLASK_PORT=8040
+             restart: unless-stopped
+             cap_add:
+               - NET_ADMIN
+               - SYS_ADMIN
+             devices:
+               - /dev/net/tun:/dev/net/tun
+             sysctls:
+               - net.ipv4.conf.all.src_valid_mark=1
+               - net.ipv4.ip_forward=1
 		 - ACEXY_LISTEN_ADDR=:8080
 		 - ACEXY_HOST=localhost
 		 - ACEXY_PORT=6878
@@ -96,6 +104,22 @@ docker pull visesa84/acestream-scraper-pyacexy:latest
 docker run -d \
   -p 8040:8040 \
   -v "${PWD}/config:/app/config" \
+      ## Environment Variables (Canonical Reference)
+
+      Key environment variables for running the container or app manually:
+
+      | Variable | Default | Description |
+      |---|---:|---|
+      | `DOCKER_ENV` | (unset) | When present, use `/app/config` inside container. |
+      | `FLASK_PORT` | `8040` | Flask application port. |
+      | `ENABLE_ACEXY` | `true` | Enable PyAcexy proxy. |
+      | `ACEXY_HOST` | `localhost` | Engine host for PyAcexy connections. |
+      | `ACEXY_PORT` | `6878` | Engine port for PyAcexy. |
+      | `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. |
+      | `CHECKSTATUS_ENABLED` | `true` | Enable automatic stream status checking. |
+      | `ACESTREAM_HTTP_PORT` | `6878` | Main engine HTTP port (background uses `6879`). |
+
+      See `wiki/Configuration.md` for full descriptions and notes.
   -v "${PWD}/recordings:/app/config/recordings" \
   --name acestream-scraper \
   visesa84/acestream-scraper-pyacexy:latest

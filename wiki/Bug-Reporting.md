@@ -141,6 +141,23 @@ Try these steps to gather more information about your issue:
 5. Use a descriptive title that summarizes the issue
 6. Submit the issue
 
+## Environment Variables (Canonical Reference)
+
+When filing bug reports, include the values of the following environment variables to help reproduction:
+
+| Variable | Default | Description |
+|---|---:|---|
+| `DOCKER_ENV` | (unset) | When set, container uses `/app/config` for config and DB. |
+| `ENABLE_ACEXY` | `true` | PyAcexy proxy enabled. |
+| `ACEXY_HOST` | `localhost` | Host/IP for PyAcexy engine connections. |
+| `ACEXY_PORT` | `6878` | Port for Acestream Engine. |
+| `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. |
+| `ACESTREAM_HTTP_PORT` | `6878` | Main engine HTTP port; background uses `6879`. |
+| `CHECKSTATUS_ENABLED` | `true` | Controls automatic stream checks; may be forced off by entrypoint. |
+| `FLASK_PORT` | `8040` | Flask application port. |
+
+Providing these values speeds up diagnosis of environment-specific failures.
+
 ## Bug Report Template
 
 Use this template to structure your bug report:

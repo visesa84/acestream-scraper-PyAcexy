@@ -42,6 +42,11 @@ class HTTPScraper(BaseScraper):
                     
                     return content
         except Exception as e:
-            content_type = getattr(response, 'headers', {}).get('Content-Type', 'unknown')
-            logger.error(f"Error fetching content from {url}: {str(e)}. Content-Type: {content_type}")
+            # Response may not exist if the error occurred before the request completed
+            content_type = 'unknown'
+            try:
+                content_type = getattr(response, 'headers', {}).get('Content-Type', 'unknown')
+            except Exception:
+                pass
+            logger.exception(f"Error fetching content from {url}. Content-Type: {content_type}")
             raise

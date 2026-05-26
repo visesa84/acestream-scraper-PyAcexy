@@ -12,6 +12,8 @@ class Config:
     # Constantes de clase (Valores por defecto)
     DEFAULT_BASE_URL = 'acestream://'
     DEFAULT_ACE_ENGINE_URL = 'http://localhost:6878'
+    # Fixed background engine check URL (background engine listens on 6879)
+    DEFAULT_ACE_ENGINE_CHECK_URL = 'http://localhost:6879'
     DEFAULT_RESCRAPE_INTERVAL = 24
     DEFAULT_CHECKSTATUS_INTERVAL = 24
     DEFAULT_CHECKSTATUS_ENABLED = True
@@ -36,8 +38,8 @@ class Config:
         self.settings_repo = None
         self._needs_init = True
         
-        if os.environ.get('DOCKER_ENVIRONMENT'):
-            base_config_dir = Path('/config')
+        if os.environ.get('DOCKER_ENV'):
+            base_config_dir = Path('/app/config')
         else:
             project_root = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
             base_config_dir = project_root / 'config'
@@ -170,7 +172,12 @@ class Config:
     @ace_engine_url.setter
     def ace_engine_url(self, value):
         self.set('ace_engine_url', value)
-    
+
+    @property
+    def ace_engine_check_url(self):
+        # Always returns the fixed background engine check URL; not stored in DB
+        return self.DEFAULT_ACE_ENGINE_CHECK_URL
+
     @property
     def rescrape_interval(self):
         val = self.get('rescrape_interval', self.DEFAULT_RESCRAPE_INTERVAL)
@@ -194,6 +201,11 @@ class Config:
     @property
     def checkstatus_enabled(self):
         if self._needs_init: return self.DEFAULT_CHECKSTATUS_ENABLED
+        # Container-level override: entrypoint.sh exports CHECKSTATUS_ENABLED=false
+        # when ENABLE_ACESTREAM_ENGINE=false so workers never try to reach a dead engine.
+        env_val = os.environ.get('CHECKSTATUS_ENABLED')
+        if env_val is not None:
+            return env_val.lower() in ('true', 'yes', '1', 'on')
         val = self.get('checkstatus_enabled', self.DEFAULT_CHECKSTATUS_ENABLED)
         if isinstance(val, str):
             return val.lower() in ('true', 'yes', '1', 'on')

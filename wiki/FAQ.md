@@ -239,3 +239,21 @@ The application includes comprehensive health checks:
 - HTTP endpoint: `/health`
 - Docker health checks are configured
 - You can use monitoring tools like Prometheus with the health endpoint
+
+## Environment Variables (Canonical Reference)
+
+Include the following environment variables when reporting issues or configuring deployments:
+
+| Variable | Default | Description |
+|---|---:|---|
+| `DOCKER_ENV` | (unset) | When set, container uses `/app/config` for DB and config. |
+| `ENABLE_ACEXY` | `true` | PyAcexy proxy enabled. |
+| `ACEXY_HOST` | `localhost` | Host/IP for PyAcexy engine connections. |
+| `ACEXY_PORT` | `6878` | Port for Acestream Engine. |
+| `ACEXY_BUFFER_SIZE` | `10` | Buffer size (MB) for PyAcexy. |
+| `ACEXY_NO_RESPONSE_TIMEOUT` | `15` | Timeout for engine responses (s). |
+| `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. |
+| `ACESTREAM_HTTP_PORT` | `6878` | Main engine HTTP port; background uses `6879`. |
+| `CHECKSTATUS_ENABLED` | `true` | Controls automatic stream checks; may be forced off by entrypoint. |
+
+Include these values in bug reports to help reproduce environment-specific issues.

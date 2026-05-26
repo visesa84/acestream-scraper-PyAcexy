@@ -130,7 +130,7 @@ class ZeronetScraper(BaseScraper):
                                   f"Error: {str(e)}. Waiting {delay} seconds...")
                     await asyncio.sleep(delay)
                 else:
-                    logger.error(f"Max retries reached for {internal_url}. Last error: {last_error}")
+                    logger.exception(f"Max retries reached for {internal_url}. Last error: {last_error}")
                     raise
         
         if last_error:

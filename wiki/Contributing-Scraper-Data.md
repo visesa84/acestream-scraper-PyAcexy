@@ -154,3 +154,18 @@ When submitting, please use the title format: "Scraper Data: [Site Pattern]" (wi
 ## Thank You!
 
 Your contributions help make Acestream Scraper more effective for everyone. By providing structured data instead of direct URLs, you help us improve the application while maintaining security.
+
+## Environment Variables (Canonical Reference)
+
+If you are contributing data or testing scrapers in a deployment, include these runtime variables in your report:
+
+| Variable | Default | Description |
+|---|---:|---|
+| `DOCKER_ENV` | (unset) | When set, container uses `/app/config` for config and DB. |
+| `ENABLE_ACEXY` | `true` | PyAcexy proxy enabled. |
+| `ACEXY_HOST` | `localhost` | Host/IP for PyAcexy engine connections. |
+| `ACEXY_PORT` | `6878` | Port for Acestream Engine. |
+| `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. |
+| `CHECKSTATUS_ENABLED` | `true` | Controls automatic stream checks; may be forced off by entrypoint. |
+
+Including these values helps maintainers reproduce the same runtime environment when testing your reports.

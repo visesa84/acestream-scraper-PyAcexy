@@ -369,6 +369,33 @@ Cloudflare WARP provides enhanced privacy and secure tunneling:
 - `ENABLE_TOR`: Enable TOR for ZeroNet connections (default: `false`)
 - `TZ`: Timezone for the container (default: `Europe/Madrid`)
 
+## Environment Variables (Canonical Reference)
+
+The table below is the canonical reference for environment variables used by the image and entrypoint. Defaults shown match the image defaults; override them in `docker run` or `docker-compose` as needed.
+
+| Variable | Default | Description |
+|---|---:|---|
+| `DOCKER_ENV` | (unset) | When present, container treats paths as Docker mounts and uses `/app/config` for config and DB. |
+| `FLASK_PORT` | `8040` | Port the Flask application listens on. |
+| `ENABLE_ACEXY` | `true` | Enable the PyAcexy proxy. |
+| `ACEXY_LISTEN_ADDR` | `:8080` | Listen address for PyAcexy. |
+| `ACEXY_HOST` | `localhost` | Hostname/IP of the Acestream Engine PyAcexy connects to. |
+| `ACEXY_PORT` | `6878` | Port of the Acestream Engine. |
+| `ACEXY_NO_RESPONSE_TIMEOUT` | `15` | Timeout (s) for Acestream responses. |
+| `ACEXY_BUFFER_SIZE` | `10` | Buffer size (MB) for PyAcexy transfers. |
+| `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. If `false`, entrypoint forces `CHECKSTATUS_ENABLED=false`. |
+| `ACESTREAM_HTTP_PORT` | `6878` | Main Acestream Engine HTTP port. Background checker uses `6879` internally. |
+| `ACESTREAM_HTTP_HOST` | (uses `ACEXY_HOST`) | Host used to address the engine. |
+| `CHECKSTATUS_ENABLED` | `true` | Controls automatic stream status checking; entrypoint may override based on engine settings. |
+| `EXTRA_FLAGS` | (image default) | Extra flags passed to the Acestream engine binary. |
+| `LD_PRELOAD` | jemalloc path | Preloaded library path; image sets jemalloc by default. |
+| `MALLOC_CONF` | `dirty_decay_ms:1000,muzzy_decay_ms:1000` | jemalloc config string. |
+
+Notes:
+- The entrypoint supports two start modes: `main-only` and `both` (main + background). `background-only` is not supported.
+- If `ACEXY_HOST` points to an external host, the entrypoint disables internal engines and sets `CHECKSTATUS_ENABLED=false` because the built-in background check URL is always `http://localhost:6879`.
+- The helper script `start_two_engines.sh` and `bind_remap.so` are used to run a background checker engine without colliding the P2P port (`8621` → `8622` remap for the background instance).
+
 ### Channel Status Checking
 
 The application verifies if channels are available:

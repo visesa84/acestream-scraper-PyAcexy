@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 class ChannelStatusService:
     def __init__(self):
         config = Config()
-        self.ace_engine_url = config.ace_engine_url 
+        # Use a dedicated engine URL for checks if configured, otherwise use the main engine
+        self.ace_engine_url = config.ace_engine_check_url
         # Puerto 8080: Para saber si tú estás viendo el canal
         self.proxy_url = "/".join(config.base_url.split("/")[:3])
         self.timeout = aiohttp.ClientTimeout(total=5, connect=2)
@@ -93,9 +94,14 @@ class ChannelStatusService:
         finally:
             if command_url and not is_already_watching:
                 try:
-                    async with session.get(f"{command_url}?method=stop", timeout=2) as r:
+                    from urllib.parse import urlparse, urlencode, parse_qsl, urlunparse
+                    _parsed = urlparse(command_url)
+                    _params = dict(parse_qsl(_parsed.query))
+                    _params['method'] = 'stop'
+                    _stop_url = urlunparse(_parsed._replace(query=urlencode(_params)))
+                    async with session.get(_stop_url, timeout=2) as r:
                         await r.release()
-                except:
+                except Exception:
                     pass
 
         # 3. DB

@@ -8,13 +8,13 @@ from typing import Optional, List, Union, Dict, Any
 from ..models import ScrapedURL, AcestreamChannel
 from ..extensions import db
 from ..scrapers import create_scraper
-from flask import current_app
+from flask import current_app, has_app_context
 from sqlalchemy.exc import OperationalError
 from contextlib import contextmanager
 from ..services import ScraperService
 from ..repositories import URLRepository
 from ..utils.config import Config
-from .workers import EPGRefreshWorker
+from .workers import EPGRefreshWorker, ChannelCleanupWorker
 from app.models.epg_source import EPGSource
 from app.services.epg_service import EPGService
 from app.services.tv_channel_service import TVChannelService
@@ -34,6 +34,7 @@ class TaskManager:
         self.scraper_service = ScraperService()
         self.url_repository = URLRepository()
         self.epg_refresh_worker = EPGRefreshWorker()
+        self.cleanup_worker = ChannelCleanupWorker()
         self.tv_channel_service = TVChannelService()
         # Setting last_epg_refresh to None will force an initial refresh
         # This will be updated after the first refresh
@@ -94,17 +95,16 @@ class TaskManager:
             
         self._processing_urls.add(url)        
         try:
-            if self.app and not current_app._get_current_object():
+            # Ensure we have an app context when running scrapers
+            if self.app and not has_app_context():
                 with self.app.app_context():
                     links, status = await self.scraper_service.scrape_url(url)
-                    # Track if channels were actually updated (not just checked)
-                    if status == "OK" and links:
-                        self.channels_updated_in_cycle = True
             else:
                 links, status = await self.scraper_service.scrape_url(url)
-                # Track if channels were actually updated (not just checked)
-                if status == "OK" and links:
-                    self.channels_updated_in_cycle = True
+
+            # Track if channels were actually updated (not just checked)
+            if status == "OK" and links:
+                self.channels_updated_in_cycle = True
         finally:
             self._processing_urls.remove(url)
     
@@ -201,6 +201,7 @@ class TaskManager:
                             self.logger.info("URLs processed, re-associating channels by EPG ID...")
                             await self.associate_channels_by_epg()
                             await asyncio.sleep(5)
+                            await self.cleanup_worker.cleanup_old_channels()
                             
                     # 2. Lógica de Status Channels
                     # Verificamos primero si la tarea está habilitada en la configuración

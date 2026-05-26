@@ -80,22 +80,95 @@ if [ "$ENABLE_TOR" = "true" ]; then
     echo "Tor service logs available at $LOG_DIR/tor.log"
 fi
 
-# Start Acestream Engine if enabled
+# Start Acestream Engine(s) if enabled
 if [ "$ENABLE_ACESTREAM_ENGINE" = "true" ]; then
-    echo "Starting Acestream engine..."
-	# Limpiar posibles comillas literales que hayan quedado en la variable
-	EXTRA_FLAGS=$(echo $EXTRA_FLAGS | sed 's/"//g')
-    /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream.log" 2>&1 & 
-	ACESTREAM_PID=$!	
-    sleep 3 # Brief pause to allow Acestream engine to start
-    echo "Acestream engine logs available at $LOG_DIR/acestream.log"
+    # Sanitize EXTRA_FLAGS and ensure buffer size
+    export EXTRA_FLAGS=$(echo ${EXTRA_FLAGS:-} | sed 's/"//g')
+    export ACEXY_BUFFER_SIZE=${ACEXY_BUFFER_SIZE:-10}
+    # Use ACESTREAM_HTTP_PORT from env (set in Dockerfile, default: 6878)
+    export ACESTREAM_HTTP_PORT=${ACESTREAM_HTTP_PORT:-6878}
+
+    # Determine whether ACEXY_HOST points to an external engine (not local)
+    SKIP_ALL_ENGINES=0
+    if [ -n "${ACEXY_HOST:-}" ] && [ "$ACEXY_HOST" != "localhost" ] && [ "$ACEXY_HOST" != "127.0.0.1" ]; then
+        echo "ACEXY_HOST points to external host ($ACEXY_HOST); will not start any internal engine."
+        SKIP_ALL_ENGINES=1
+        # Stream checks always use localhost:6879 — disable them when engine is external
+        export CHECKSTATUS_ENABLED=false
+        echo "ACEXY_HOST is external; stream status checks disabled (CHECKSTATUS_ENABLED=false)."
+    fi
+
+    # Decide startup mode based on CHECKSTATUS_ENABLED env var (default: true)
+    if [ -z "${CHECKSTATUS_ENABLED:-}" ]; then
+        CHECKSTATUS_ENABLED=true
+    fi
+    echo "checkstatus_enabled = $CHECKSTATUS_ENABLED"
+
+    if [ "$CHECKSTATUS_ENABLED" = "false" ] || [ "$CHECKSTATUS_ENABLED" = "0" ]; then
+        START_MODE="main-only"
+    else
+        START_MODE="both"
+    fi
+
+    # Locate bind_remap.so for direct fallback use (in case start_two_engines.sh is absent)
+    SO=""
+    for _so_path in /usr/local/lib/bind_remap.so /app/scripts/bind_remap.so; do
+        [ -f "$_so_path" ] && SO="$_so_path" && break
+    done
+
+    # Start the helper script in appropriate mode
+    if [ "$SKIP_ALL_ENGINES" -eq 1 ]; then
+        echo "Skipping internal Acestream engine startup because configuration points to external engine."
+    else
+        if [ -x "/app/scripts/start_two_engines.sh" ]; then
+            if [ "$START_MODE" = "main-only" ]; then
+                /app/scripts/start_two_engines.sh main-only >> "$LOG_DIR/acestream.log" 2>&1 &
+            else
+                /app/scripts/start_two_engines.sh both >> "$LOG_DIR/acestream.log" 2>&1 &
+            fi
+        else
+            echo "start_two_engines.sh not found or not executable; attempting direct start"
+            if [ "$START_MODE" = "main-only" ]; then
+                /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream.log" 2>&1 &
+                ACESTREAM_PID=$!
+            else
+                # fallback: start two engines manually if we can't use the helper
+                # Main engine starts normally (no remap needed)
+                /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream_main.log" 2>&1 &
+                PID_MAIN=$!
+                # Background engine starts in a subshell with remap env vars so the
+                # parent process (and gunicorn/pyacexy started later) are NOT affected
+                (
+                    if [ -n "$SO" ]; then
+                        export ACE_BIND_REMAP=1
+                        export ACE_BIND_REMAP_FROM=${ACESTREAM_HTTP_PORT}
+                        export ACE_BIND_REMAP_TO=6879
+                        export ACE_BIND_REMAP_FROM_P2P=8621
+                        export ACE_BIND_REMAP_TO_P2P=8622
+                        export LD_PRELOAD="$SO"
+                    fi
+                    exec /opt/acestream/start-engine --client-console --http-port 6879 $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream_background.log" 2>&1
+                ) &
+                PID_BG=$!
+                ACESTREAM_PID=$PID_MAIN
+            fi
+        fi
+    fi
+    sleep 3
+    echo "Acestream engine startup log: $LOG_DIR/acestream.log"
+fi
+
+# If Acestream Engine is disabled, background engine on :6879 won't exist —
+# force stream status checks off so the app doesn't waste time on failed checks.
+if [ "$ENABLE_ACESTREAM_ENGINE" = "false" ]; then
+    export CHECKSTATUS_ENABLED=false
+    echo "ENABLE_ACESTREAM_ENGINE is disabled; stream status checks disabled (CHECKSTATUS_ENABLED=false)."
 fi
 
 # Start PyAcexy if enabled
 if [ "$ENABLE_ACEXY" = "true" ]; then
     if [ "$ENABLE_ACESTREAM_ENGINE" = "false" ] && [ "$ACEXY_HOST" = "localhost" ] && [ "$ACEXY_PORT" = "6878" ]; then
-        echo "ERROR: When Acestream Engine is disabled, you must specify ACEXY_HOST and ACEXY_PORT other than localhost to connect to an external Acestream Engine instance"
-        exit 1
+        echo "WARNING: Acestream Engine is disabled and ACEXY_HOST is set to localhost:6878 — pyacexy will try to connect to localhost inside the container which may not be correct. Continuing startup."
     fi
     
     echo "Starting PyAcexy proxy..."
@@ -119,8 +192,17 @@ echo "ZeroNet logs available at $LOG_DIR/zeronet.log"
 echo "Waiting for ZeroNet to initialize..."
 sleep 10
 
-# Start Flask app with Gunicorn
+# Run database migrations before starting the app
 cd /app
+echo "Running database migrations..."
+python manage.py upgrade >> "$LOG_DIR/migrations.log" 2>&1
+if [ $? -ne 0 ]; then
+    echo "WARNING: Database migration failed — check $LOG_DIR/migrations.log"
+else
+    echo "Database migrations completed successfully."
+fi
+
+# Start Flask app with Gunicorn
 echo "Starting Flask application on port $FLASK_PORT..."
 gunicorn --bind "0.0.0.0:$FLASK_PORT" \
     --workers 4 \

@@ -3,12 +3,18 @@ import subprocess
 import os
 from app import create_app
 from whitenoise import WhiteNoise
+import logging
 
-# 1. Migraciones
-try:
-    subprocess.run([sys.executable, "manage.py", "upgrade"], check=True)
-except Exception as e:
-    print(f"Migration error: {e}")
+# 1. Migraciones (opcional): ejecutar sólo si la variable de entorno AUTO_MIGRATE=1
+if os.environ.get('AUTO_MIGRATE', '0') == '1':
+    try:
+        subprocess.run([sys.executable, "manage.py", "upgrade"], check=True)
+    except Exception as e:
+        print(f"Migration error: {e}")
+
+# NOTE: Local engine startup is handled in /app/entrypoint.sh so it runs once
+# per container start (not per Gunicorn worker). Removed startup code from
+# the WSGI module to avoid launching processes during worker bootstrap.
 
 # 2. Crear App Flask
 flask_app = create_app()

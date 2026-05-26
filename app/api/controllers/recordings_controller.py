@@ -125,8 +125,8 @@ class RecordingList(Resource):
             rec = schedules_map.get(program_id)
             
             # PRIORIDAD DE FECHAS: Schedule modificado > EPG Original
-            d_start = rec.start_time.isoformat() if rec.start_time else "N/A"
-            d_end = rec.end_time.isoformat() if rec.end_time else "N/A"
+            d_start = rec.start_time.isoformat() if rec and rec.start_time else "N/A"
+            d_end = rec.end_time.isoformat() if rec and rec.end_time else "N/A"
 
             # Lógica de estado de parte activa
             actual_status = 'completed'

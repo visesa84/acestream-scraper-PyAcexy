@@ -54,35 +54,33 @@ Create or edit `config/config.json`:
 - **checkstatus_interval**: Hours between automatic rescans of streams
 - **checkstatus_enabled**: Enable or disable Task
 
-## Environment Variables
+## Environment Variables (Canonical Reference)
 
-### Core Application
+The table below is the single canonical reference for environment variables used by the application and container. Defaults match the image; override them in your runtime as necessary.
 
-| Variable | Description | Default | Notes |
-|----------|-------------|---------|-------|
-| `FLASK_PORT` | Port the Flask application runs on | `8040` | Can be changed if port 8040 is in use |
-| `FLASK_ENV` | Flask environment mode | `production` | Use `development` for debugging |
+| Variable | Default | Description |
+|---|---:|---|
+| `DOCKER_ENV` | (unset) | When present, the container uses `/app/config` for config and DB paths. |
+| `FLASK_PORT` | `8040` | Port the Flask application listens on. |
+| `FLASK_ENV` | `production` | Flask environment mode. |
+| `ENABLE_ACEXY` | `true` | Enable PyAcexy proxy. |
+| `ACEXY_LISTEN_ADDR` | `:8080` | Listen address for PyAcexy. |
+| `ACEXY_HOST` | `localhost` | Hostname/IP of the Acestream Engine PyAcexy connects to. |
+| `ACEXY_PORT` | `6878` | Port of the Acestream Engine. |
+| `ACEXY_NO_RESPONSE_TIMEOUT` | `15` | Timeout (s) for Acestream responses. |
+| `ACEXY_BUFFER_SIZE` | `10` | Buffer size (MB) for PyAcexy transfers. |
+| `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. If `false`, entrypoint forces `CHECKSTATUS_ENABLED=false`. |
+| `ACESTREAM_HTTP_PORT` | `6878` | Main Acestream Engine HTTP port (background checker uses `6879`). |
+| `ACESTREAM_HTTP_HOST` | (uses `ACEXY_HOST`) | Engine host value; defaults to `ACEXY_HOST`. |
+| `CHECKSTATUS_ENABLED` | `true` | Controls automatic stream status checking. Entry point may override. |
+| `EXTRA_FLAGS` | (image default) | Extra flags passed to the Acestream engine. |
+| `LD_PRELOAD` | jemalloc path | Preloaded library path; image sets jemalloc by default. |
+| `MALLOC_CONF` | `dirty_decay_ms:1000,muzzy_decay_ms:1000` | jemalloc config string. |
 
-### Acestream Configuration
-
-| Variable | Description | Default | Notes |
-|----------|-------------|---------|-------|
-| `ENABLE_ACESTREAM_ENGINE` | Enable built-in Acestream Engine | Matches `ENABLE_ACEXY` | Set to `true` to run Acestream in the container |
-| `ACESTREAM_HTTP_PORT` | Port for Acestream engine | `6878` | Internal Acestream Engine HTTP port |
-| `ACESTREAM_HTTP_HOST` | Host for Acestream engine | Uses `ACEXY_HOST` | Address to access Acestream Engine |
-
-### PyAcexy Configuration
-
-| Variable | Description | Default | Notes |
-|----------|-------------|---------|-------|
-| `ENABLE_ACEXY` | Enable Acexy proxy | `false` | Set to `true` to enable enhanced Acestream proxy |
-| `ACEXY_LISTEN_ADDR` | Address for Acexy to listen on | `:8080` | Format is `[host]:port` or just `:port` |
-| `ACEXY_HOST` | Hostname of Acestream Engine | `localhost` | Hostname or IP where Acestream Engine runs |
-| `ACEXY_PORT` | Port of Acestream Engine | `6878` | Port where Acestream Engine is accessible |
-| `ACEXY_NO_RESPONSE_TIMEOUT` | Timeout for Acestream responses | `15s` | Format: `15s`, `1m`, etc. |
-| `ACEXY_BUFFER_SIZE` | Buffer size for data transfers in MiB | `5` | Format: `5`, `10`, etc. |
-
-### Why Both PyAcexy and Acestream Engine?
+Notes:
+- The entrypoint supports two modes: `main-only` and `both` (main + background). `background-only` is not supported.
+- If `ACEXY_HOST` points to an external host, the entrypoint disables internal engines and sets `CHECKSTATUS_ENABLED=false` because the built-in background check URL is `http://localhost:6879`.
+- `start_two_engines.sh` and `bind_remap.so` are used to remap P2P port `8621`→`8622` for the background instance to avoid collisions.
 
 Acestream Scraper includes both PyAcexy and Acestream Engine for improved multi-client handling:
 

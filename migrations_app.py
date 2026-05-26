@@ -6,9 +6,9 @@ from flask_migrate import Migrate
 # Initialize app with basic config
 app = Flask(__name__)
 
-# Set SQLite URI - use only '/config' path, not '/app/config'
-if os.environ.get('DOCKER_ENVIRONMENT'):
-    db_path = '/config/acestream.db'
+# Set SQLite URI
+if os.environ.get('DOCKER_ENV'):
+    db_path = '/app/config/acestream.db'
 else:
     db_path = os.path.join(os.path.dirname(__file__), 'config', 'acestream.db')
 

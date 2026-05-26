@@ -113,3 +113,20 @@ Additional requirements for development work:
 - **Python development tools**: python-dev, build-essential
 - **Testing tools**: pytest, coverage
 - **Code quality tools**: flake8, black, isort
+
+## Environment Variables (Canonical Reference)
+For deployments, ensure these env vars are documented and match your environment:
+
+| Variable | Default | Description |
+|---|---:|---|
+| `DOCKER_ENV` | (unset) | When set, container uses `/app/config` for config and DB. |
+| `ENABLE_ACEXY` | `true` | Enable PyAcexy proxy. |
+| `ACEXY_HOST` | `localhost` | Host/IP where PyAcexy should connect. |
+| `ACEXY_PORT` | `6878` | Port of the Acestream Engine. |
+| `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. |
+| `ACESTREAM_HTTP_PORT` | `6878` | Main engine HTTP port; background uses `6879`. |
+| `CHECKSTATUS_ENABLED` | `true` | Controls automatic stream checks. |
+
+- `DOCKER_ENV`, `ENABLE_ACEXY`, `ENABLE_ACESTREAM_ENGINE`, `CHECKSTATUS_ENABLED`, `ACESTREAM_HTTP_PORT`, `ACEXY_HOST`, `ACEXY_PORT`, `ACEXY_BUFFER_SIZE`.
+
+These affect ports, background checks and whether internal engines are started; include them in your deployment checklist.

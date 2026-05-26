@@ -116,3 +116,21 @@ docker run -d -p 8040:8040 -v "${PWD}/config:/app/config" -v "${PWD}/recordings:
 ```
 
 This mounts your local `./config` directory to the container's `/app/config` directory.
+
+## Environment Variables (Canonical Reference)
+
+The following table is the canonical reference for environment variables used by the Docker image and entrypoint. Override any value in your `docker run` or `docker-compose` configuration.
+
+| Variable | Default | Description |
+|---|---:|---|
+| `DOCKER_ENV` | (unset) | When present, container treats paths as Docker mounts and uses `/app/config` for config and DB. |
+| `ENABLE_ACEXY` | `true` | Enable the PyAcexy proxy. |
+| `ACEXY_LISTEN_ADDR` | `:8080` | Listen address for PyAcexy. |
+| `ACEXY_HOST` | `localhost` | Hostname/IP where PyAcexy connects to the engine. |
+| `ACEXY_PORT` | `6878` | Port of the Acestream Engine. |
+| `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. If `false`, entrypoint forces `CHECKSTATUS_ENABLED=false`. |
+| `ACESTREAM_HTTP_PORT` | `6878` | Main Acestream Engine HTTP port; background-checker uses `6879` internally. |
+| `CHECKSTATUS_ENABLED` | `true` | Enable automatic stream status checking; may be overridden by entrypoint logic. |
+
+Notes:
+- `start_two_engines.sh` and `bind_remap.so` are used to run a background checker engine while remapping P2P ports (default remap `8621`→`8622`) to avoid collisions.

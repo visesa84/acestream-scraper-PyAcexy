@@ -45,6 +45,21 @@ The application follows a service-oriented architecture with:
 - [Requirements](Requirements.md) - System and software requirements
 - [FAQ](FAQ.md) - Frequently asked questions
 
+## Environment Variables (Canonical Reference)
+
+Canonical environment variables used across the project (short form):
+
+| Variable | Default | Description |
+|---|---:|---|
+| `DOCKER_ENV` | (unset) | When set, container uses `/app/config` for config and DB. |
+| `ENABLE_ACEXY` | `true` | Enable PyAcexy proxy. |
+| `ACEXY_HOST` | `localhost` | Host/IP where PyAcexy should connect. |
+| `ACEXY_PORT` | `6878` | Port of the Acestream Engine. |
+| `ENABLE_ACESTREAM_ENGINE` | `true` | Start internal Acestream Engine instances. |
+| `CHECKSTATUS_ENABLED` | `true` | Controls automatic stream status checks. |
+
+See `wiki/Configuration.md` for full descriptions and recommended defaults.
+
 ## License
 
 This project is licensed under the MIT License.

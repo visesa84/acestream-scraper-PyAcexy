@@ -3,7 +3,6 @@ import subprocess
 import psutil
 import re
 import threading
-import shutil
 from datetime import datetime
 from app.extensions import db
 from app.models import RecordingSchedule, EPGProgram, TVChannel, AcestreamChannel, Setting
@@ -40,10 +39,13 @@ def eliminar_fragmentos_congelados(video_input, video_output, ruido="-60db", dur
     print("Analyzing the video for frozen fragments...")
     
     # 1. Ejecutar freezedetect y capturar la salida de texto (stderr)
-    comando_detectar = f'ffmpeg -i "{video_input}" -vf freezedetect=n={ruido}:d={duracion_minima} -f null -'
-    
-    proceso = subprocess.run(comando_detectar, stderr=subprocess.PIPE, text=True, encoding="utf-8", shell=True)
-    log_output = proceso.stderr
+    cmd_detect = [
+        'ffmpeg', '-i', video_input,
+        '-vf', f'freezedetect=n={ruido}:d={duracion_minima}',
+        '-f', 'null', '-'
+    ]
+    proceso = subprocess.run(cmd_detect, stderr=subprocess.PIPE, text=True, encoding="utf-8", check=False)
+    log_output = proceso.stderr or ''
 
     # 2. Buscar la duración total del video para el fragmento final
     match_duracion = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", log_output)
@@ -59,10 +61,14 @@ def eliminar_fragmentos_congelados(video_input, video_output, ruido="-60db", dur
     ends = [float(x) for x in re.findall(r"freeze_end:\s*([0-9.]+)", log_output)]
 
     if not starts:
-        print("Perfect! No frozen fragments were detected. No need to cut.")
-        # Simplemente movemos el archivo original al nombre de salida
-        # para que el resto del flujo (borrado del original) funcione igual.
-        shutil.move(video_input, video_output)
+        print("No frozen fragments detected. Remuxing to MP4 for web playback...")
+        cmd_remux = [
+            'ffmpeg', '-y', '-i', video_input,
+            '-c', 'copy',
+            '-movflags', '+faststart',
+            video_output
+        ]
+        subprocess.run(cmd_remux, check=True)
         return
 
     print(f"{len(starts)} frozen fragments were detected. Calculating cuts...")
@@ -90,9 +96,17 @@ def eliminar_fragmentos_congelados(video_input, video_output, ruido="-60db", dur
 
     # 5. Configurar y lanzar el comando de corte final
     print("Processing and exporting the clean video (re-encoding)...")
-    comando_cortar = f'ffmpeg -y -i "{video_input}" -vf select="{filtro_final}",setpts=N/FRAME_RATE/TB -af aselect="{filtro_final}",asetpts=N/SR/TB -c:v libx264 -preset superfast -c:a aac -movflags +faststart "{video_output}"'
+    vf_value = f'select={filtro_final},setpts=N/FRAME_RATE/TB'
+    af_value = f'aselect={filtro_final},asetpts=N/SR/TB'
+    cmd_cut = [
+        'ffmpeg', '-y', '-i', video_input,
+        '-vf', vf_value,
+        '-af', af_value,
+        '-c:v', 'libx264', '-preset', 'superfast',
+        '-c:a', 'aac', '-movflags', '+faststart', video_output
+    ]
 
-    subprocess.run(comando_cortar, shell=True)
+    subprocess.run(cmd_cut, check=True)
     print(f"Process completed successfully! File saved as: {video_output}")
 
 def disparar_conversion(app, rec):
@@ -255,7 +269,20 @@ def process_recordings(app, single_program_id=None):
             cmd_str = f'ffmpeg -y -hide_banner -loglevel error -fflags +genpts+discardcorrupt -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 -rw_timeout 15000000 -i "{stream_url}" -t {int(duration)} -c:v copy -c:a aac -af "aresample=async=1" -vsync 1 -user_agent "prog_id:{prog.id}" "{filename}"'
 
             try:
-                subprocess.Popen(cmd_str, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                # Build argument list to avoid shell injection and handle spaces in paths
+                cmd = [
+                    'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
+                    '-fflags', '+genpts+discardcorrupt',
+                    '-reconnect', '1', '-reconnect_at_eof', '1', '-reconnect_streamed', '1',
+                    '-reconnect_delay_max', '5', '-rw_timeout', '15000000',
+                    '-i', stream_url,
+                    '-t', str(int(duration)),
+                    '-c:v', 'copy', '-c:a', 'aac',
+                    '-af', 'aresample=async=1', '-vsync', '1',
+                    '-user_agent', f'prog_id:{prog.id}', filename
+                ]
+
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
                 rec.status = 'recording'
                 db.session.commit()
                 app.logger.info(f"[RECORDER] Started: {prog.title} ID:{prog.id}")

@@ -37,6 +37,13 @@ def create_scraper_for_url(url: str, url_type: str, timeout: Optional[int] = Non
 # For backward compatibility
 def create_scraper(url: str, timeout: Optional[int] = None, retries: Optional[int] = None) -> BaseScraper:
     """Legacy function for backward compatibility"""
-    return create_scraper_for_url(url, 'auto', timeout, retries)
+    # Auto-detect URL type and delegate to create_scraper_for_url with explicit type
+    url_obj = create_url_object(url, 'auto')
+    if isinstance(url_obj, ZeronetURL):
+        detected_type = 'zeronet'
+    else:
+        detected_type = 'regular'
+
+    return create_scraper_for_url(url, detected_type, timeout, retries)
 
 __all__ = ['create_scraper', 'create_scraper_for_url', 'BaseScraper', 'HTTPScraper', 'ZeronetScraper']

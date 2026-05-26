@@ -4,6 +4,7 @@ import threading
 import logging
 import fasteners
 import time
+import tempfile
 from flask import Flask, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 from app.extensions import db, migrate
@@ -100,7 +101,10 @@ def create_app(test_config=None):
                 def run_background_loop():
                     from app.tasks.recorder import process_recordings # Importación local
                     
-                    lock = fasteners.InterProcessLock('/tmp/task_manager.lock')
+                    # Use the system temp directory for the lock file for portability
+                    tmpdir = tempfile.gettempdir()
+                    lockfile = os.path.join(tmpdir, 'task_manager.lock')
+                    lock = fasteners.InterProcessLock(lockfile)
                     got_lock = lock.acquire(blocking=False)
                     
                     if not got_lock:
