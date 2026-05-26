@@ -40,7 +40,7 @@ COPY scripts/bind_remap.c /tmp/bind_remap.c
 RUN if [ -f /tmp/bind_remap.c ]; then \
             apt-get update && apt-get install -y --no-install-recommends gcc && \
             gcc -fPIC -shared -o /usr/local/lib/bind_remap.so /tmp/bind_remap.c -ldl && \
-            rm -f /tmp/bind_remap.c && apt-get remove -y gcc && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*; \
+            rm -f /tmp/bind_remap.c \
         else echo "bind_remap.c not found, skipping"; fi
 
 # Configuración de TOR
