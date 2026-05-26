@@ -55,6 +55,7 @@ A Python-based web scraping application that retrieves Acestream channel informa
 		 - ENABLE_TOR=false
 		 - ENABLE_ACEXY=true
 		 - ENABLE_ACESTREAM_ENGINE=true
+   		 - CHECKSTATUS_ENABLED=true
 		 - ENABLE_WARP=false
 		 - CONTAINER_NETWORK_MODE=host
 		 - WARP_LICENSE_KEY=
