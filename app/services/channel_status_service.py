@@ -18,7 +18,7 @@ class ChannelStatusService:
         self.ace_engine_url = config.ace_engine_check_url
         # Puerto 8080: Para saber si tú estás viendo el canal
         self.proxy_url = "/".join(config.base_url.split("/")[:3])
-        self.timeout = aiohttp.ClientTimeout(total=5, connect=2)
+        self.timeout = aiohttp.ClientTimeout(total=20, connect=5)
         self._session = None
 
     async def get_session(self):
@@ -70,18 +70,30 @@ class ChannelStatusService:
                     resp_data = data.get('response') or {} 
                     stat_url = resp_data.get('stat_url')
                     command_url = resp_data.get('command_url')
+                    stream_url = resp_data.get('stream_url') or resp_data.get('play_url')
                     
                     if stat_url:
-                        for attempt in range(5):
-                            await asyncio.sleep(3)
+                        for attempt in range(10):
+                            await asyncio.sleep(min(1 + attempt, 5))
                             async with session.get(stat_url) as s_resp:
                                 if s_resp.status == 200:
                                     s_data = await s_resp.json() or {}
                                     res_obj = s_data.get('response') or {}
-                                    download_speed = int(res_obj.get('speed_down', 0))
-                                    if download_speed > 0:
+                                    download_speed = float(res_obj.get('speed_down', 0))
+                                    peers = int(res_obj.get('peers', 0))
+                                    if download_speed > 0 or peers > 0:
                                         is_online = True
                                         break
+                        if not is_online and stream_url:
+                            try:
+                                headers = {'Range': 'bytes=0-4095'}
+                                async with session.get(stream_url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                                    if r.status in (200, 206):
+                                        content = await r.content.read(4096)
+                                        if len(content) >= 4096:
+                                            is_online = True
+                            except Exception:
+                                pass
                         if not is_online:
                             error_msg = f"Speed 0 after {attempt+1} attempts"
                     else:
