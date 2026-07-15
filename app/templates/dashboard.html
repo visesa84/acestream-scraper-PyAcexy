@@ -32,21 +32,36 @@
                 </div>
             </div>
             <div class="card-body">
-                <!-- Add URL Form -->
-                <div class="mb-4 border-bottom pb-3">
-                    <h6 class="card-subtitle mb-2">Add New URL</h6>
-                    <form id="addUrlForm" class="mb-3">
-                        <div class="input-group">
-                            <input type="url" class="form-control" id="urlInput" 
-                                   placeholder="Enter URL to scrape" required>
-                            <select class="form-select" id="urlTypeSelect" style="max-width: 150px;">
-                                <option value="regular" selected>Regular HTTP</option>
-                                <option value="zeronet">ZeroNet</option>
-                            </select>
-                            <button type="submit" class="btn btn-primary">Add URL</button>
-                        </div>
-                    </form>
-                </div>
+                <!-- Sección de Añadir URL con el Botón de la Blacklist Integrado -->
+				<div class="mb-4 border-bottom pb-3">
+					<!-- Cabecera con título a la izquierda y el Botón Negro a la derecha -->
+					<div class="d-flex justify-content-between align-items-center mb-3">
+						<h6 class="card-subtitle mb-0 text-muted">Add New URL</h6>
+						
+						<!-- BOTÓN DE LA BLACKLIST GLOBAL -->
+						<button class="btn btn-sm btn-dark d-flex align-items-center" onclick="openGlobalBlacklistModal()">
+							<span class="me-1">🚫</span> Manage Global Blacklist
+						</button>
+					</div>
+
+					<!-- Tu formulario de siempre -->
+					<form id="addUrlForm" class="mb-3">
+						<div class="row g-2 align-items-center">
+							<div class="col-md-9">
+								<input type="url" class="form-control" id="urlInput" placeholder="Enter URL to scrape" required>
+							</div>
+							<div class="col-md-2">
+								<select class="form-select" id="urlTypeSelect">
+									<option value="regular" selected>Regular HTTP</option>
+									<option value="zeronet">ZeroNet</option>
+								</select>
+							</div>
+							<div class="col-md-1">
+								<button type="submit" class="btn btn-primary w-100">Add</button>
+							</div>
+						</div>
+					</form>
+				</div>
                 
                 <!-- URLs List -->
                 <h6 class="card-subtitle mb-2">URL Sources</h6>
@@ -143,6 +158,38 @@
                         <!-- Will be filled by JavaScript -->
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Blacklist Global -->
+<div class="modal fade" id="globalBlacklistModal" tabindex="-1" aria-labelledby="globalBlacklistModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="globalBlacklistModalLabel">🚫 Global Blacklist Management</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Formulario interno para añadir palabra clave -->
+                <div class="input-group mb-3">
+                    <input type="text" id="newBlacklistPattern" class="form-control" placeholder="e.g. Test, [FR], etc...">
+                    <button class="btn btn-danger" type="button" onclick="addBlacklistPattern()">Add to Blacklist</button>
+                </div>
+                <div class="form-text mb-3">Any channel containing any of these terms in its name or ID will be ignored during the scraping of all URLs.</div>
+                
+                <!-- Lista interactiva de términos bloqueados -->
+                <h6>Currently Blocked:</h6>
+                <div class="border rounded p-2 bg-light" style="max-height: 250px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush" id="blacklistContainer">
+                        <!-- Se generará dinámicamente con JS -->
+                        <li class="list-group-item text-muted text-center py-3">No blocked terms yet.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

@@ -1,5 +1,5 @@
 from .acestream_channel import AcestreamChannel
-from .scraped_url import ScrapedURL
+from .scraped_url import ScrapedURL, BlacklistedChannel
 from .settings import Setting
 from .url_types import BaseURL, ZeronetURL, RegularURL, create_url_object
 from .epg_source import EPGSource
@@ -22,5 +22,6 @@ __all__ = [
     'EPGProgram',
     'RecordingSchedule',
     'TVChannel',
-    'EPGChannel'
+    'EPGChannel',
+    'BlacklistedChannel'
 ]

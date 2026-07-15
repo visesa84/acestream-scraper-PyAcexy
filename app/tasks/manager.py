@@ -41,6 +41,9 @@ class TaskManager:
         self.last_epg_refresh = None
         # Track if channels were updated during current cycle
         self.channels_updated_in_cycle = False
+        
+        # 👇 1. NUEVO: Variable para registrar el loop de fondo de asyncio
+        self.loop = None
     
     def init_app(self, app):
         """Initialize with Flask app context"""
@@ -69,8 +72,12 @@ class TaskManager:
     def add_task(self, task_type: str, *args, **kwargs):
         """
         Este es el puente entre Flask y el TaskManager.
-        Lanza la tarea en el background de asyncio (Uvicorn).
+        Lanza la tarea en el background de asyncio de forma segura.
         """
+        # 👇 NUEVO: Capturamos dinámicamente la aplicación Flask si estamos dentro de una petición web
+        if has_app_context() and not self.app:
+            self.app = current_app._get_current_object()
+
         if task_type == 'scrape_url':
             url = args[0] if args else kwargs.get('url')
             if not url:
@@ -78,15 +85,41 @@ class TaskManager:
             
             self.logger.info(f"Manual trigger for URL: {url}")
             
-            # Intentamos obtener el loop de Uvicorn/Asyncio
             try:
+                # 1. Intentamos usar el loop del hilo actual (si ya existe en este worker)
                 loop = asyncio.get_running_loop()
-                # Lanzamos la tarea sin bloquear la respuesta de la API
                 loop.create_task(self.process_url(url))
             except RuntimeError:
-                # Si por algún motivo no hay loop (desarrollo local), creamos uno
-                self.logger.warning("No running loop found, starting task in new thread")
-                asyncio.run(self.process_url(url))
+                # 2. Si no hay loop en este hilo, pero el loop global está corriendo en este Worker
+                if self.loop and self.loop.is_running():
+                    self.logger.info("Submitting task to background event loop safely")
+                    asyncio.run_coroutine_threadsafe(self.process_url(url), self.loop)
+                else:
+                    # 3. Si es un worker de Gunicorn secundario sin loop de fondo:
+                    # Levantamos un hilo ligero de usar y tirar no bloqueante.
+                    self.logger.info("Background loop not active in this Gunicorn worker. Starting non-blocking fallback thread.")
+                    import threading
+                    
+                    # Nos aseguramos de guardar la referencia de la app para pasársela al hilo
+                    app_to_pass = self.app
+                    
+                    def run_fallback(app_obj):
+                        # Le inyectamos la app al manager del hilo secundario
+                        if app_obj:
+                            self.app = app_obj
+                        try:
+                            # Ejecuta el scrapeo asíncronamente en este nuevo hilo independiente
+                            asyncio.run(self.process_url(url))
+                        except Exception as e:
+                            self.logger.error(f"Error in fallback thread scraping {url}: {e}")
+                            
+                    thread = threading.Thread(
+                        target=run_fallback, 
+                        args=(app_to_pass,),
+                        name=f"FallbackScraper-{url[:15]}", 
+                        daemon=True
+                    )
+                    thread.start()
     
     async def process_url(self, url: str):
         if url in self._processing_urls:
@@ -162,6 +195,9 @@ class TaskManager:
         if not self.app:
             raise RuntimeError("TaskManager not initialized with Flask app. Call init_app() first.")
             
+        # 👇 3. NUEVO: Capturamos y guardamos el loop del hilo asíncrono que acaba de arrancar
+        self.loop = asyncio.get_running_loop()
+        
         self.running = True
         self.logger.info("Task Manager started")
         while self.running:

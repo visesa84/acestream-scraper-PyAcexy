@@ -102,7 +102,7 @@ async function populateUrlDropdown() {
     }
 }
 
-// Render the URLs list with ID and type information
+// Render the URLs list (Simplified without individual filters)
 function renderUrlsList(urlsList, stats) {
     if (!stats || !stats.urls || stats.urls.length === 0) {
         urlsList.innerHTML = `
@@ -113,7 +113,8 @@ function renderUrlsList(urlsList, stats) {
         return;
     }
     
-    const urlItems = stats.urls.map(url => `
+    const urlItems = stats.urls.map(url => {
+        return `
         <div class="list-group-item">
             <div class="row align-items-center">
                 <div class="col-md-7">
@@ -128,6 +129,7 @@ function renderUrlsList(urlsList, stats) {
                     </div>
                 </div>
                 <div class="col-md-5 text-end">
+                    <!-- Botones de acción estándar (Habilitar, Actualizar, Borrar) -->
                     <button class="btn btn-sm ${url.enabled ? 'btn-warning' : 'btn-success'}" 
                             onclick="toggleUrl('${url.id}', ${!url.enabled})">
                         ${url.enabled ? 'Disable' : 'Enable'}
@@ -143,7 +145,8 @@ function renderUrlsList(urlsList, stats) {
                 </div>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
     
     urlsList.innerHTML = urlItems;
 }
