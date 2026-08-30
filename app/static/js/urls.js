@@ -69,29 +69,39 @@ async function refreshUrl(id) {
     }
 }
 
-// Add new URL 
+// Add new URL or Channel Search
 async function addUrl(url, urlType = 'regular') {
     try {
         showLoading();
+        
+        const cleanInput = url.trim();
+        const isWebUrl = cleanInput.startsWith('http://') || 
+                         cleanInput.startsWith('https://') || 
+                         cleanInput.startsWith('ipfs://') || 
+                         cleanInput.startsWith('zeronet://');
+
+        // Si no es un enlace web, asignamos automáticamente el tipo 'search'
+        const finalUrlType = isWebUrl ? urlType : 'search';
+
         const response = await fetch('/api/urls/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ 
-                url: url,
-                url_type: urlType
+                url: cleanInput,
+                url_type: finalUrlType
             })
         });
         
-        await handleApiResponse(response, 'URL added successfully');
+        await handleApiResponse(response, isWebUrl ? 'URL added successfully' : 'Channel search completed');
         
         // Refresh dashboard data
         await refreshData();
         return true;
     } catch (error) {
-        console.error('Error adding URL:', error);
-        showAlert('danger', 'Failed to add URL: ' + error.message);
+        console.error('Error adding URL or Search:', error);
+        showAlert('danger', 'Failed to add URL/Search: ' + error.message);
         return false;
     } finally {
         hideLoading();

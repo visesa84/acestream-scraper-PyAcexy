@@ -16,7 +16,7 @@ FROM --platform=linux/arm64 python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Acestream channel scraper with ZeroNet support" \
-      version="4.3"
+      version="4.4"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -34,14 +34,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev libffi-dev logrotate cron \
     libopenblas-dev libsecp256k1-dev libtool autoconf automake pkg-config \
     && rm -rf /var/lib/apt/lists/*
-
-# Compile LD_PRELOAD remap library if source is present in build context
-COPY scripts/bind_remap.c /tmp/bind_remap.c
-RUN if [ -f /tmp/bind_remap.c ]; then \
-            apt-get update && apt-get install -y --no-install-recommends gcc && \
-            gcc -fPIC -shared -o /usr/local/lib/bind_remap.so /tmp/bind_remap.c -ldl && \
-            rm -f /tmp/bind_remap.c \
-        else echo "bind_remap.c not found, skipping"; fi
 
 # Configuración de TOR
 RUN echo "ControlPort 9051" >> /etc/tor/torrc && \
@@ -84,7 +76,6 @@ COPY requirements.txt requirements-prod.txt ./
 COPY migrations/ ./migrations/
 COPY migrations_app.py manage.py wsgi.py ./
 COPY app/ ./app/
-COPY --chmod=0755 scripts/ /app/scripts/
 
 # Instalación de dependencias de la app
 RUN pip install --no-cache-dir -r requirements.txt && \

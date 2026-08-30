@@ -16,7 +16,7 @@ FROM python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Base image for Acestream channel scraper with pyacexy" \
-      version="4.3"
+      version="4.4"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -39,13 +39,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wireguard-tools iproute2 \
 	openresolv logrotate cron \
     && rm -rf /var/lib/apt/lists/*
-
-# Compile LD_PRELOAD remap library for target architecture so buildx produces the correct binary
-# If `scripts/bind_remap.c` exists in the build context, compile it now into /usr/local/lib
-COPY scripts/bind_remap.c /tmp/bind_remap.c
-RUN if [ -f /tmp/bind_remap.c ]; then \
-            gcc -fPIC -shared -o /usr/local/lib/bind_remap.so /tmp/bind_remap.c -ldl && rm /tmp/bind_remap.c; \
-        else echo "No bind_remap.c in context, skipping compilation"; fi
 
 # Configuración de TOR
 RUN echo "ControlPort 9051" >> /etc/tor/torrc && \
@@ -150,7 +143,7 @@ FROM base
 
 # Update metadata labels for the final image
 LABEL description="Acestream channel scraper with ZeroNet support" \
-      version="4.3"
+      version="4.4"
 
 # Copy application files
 COPY --chmod=0755 entrypoint.sh /app/entrypoint.sh
@@ -162,7 +155,6 @@ COPY migrations/ ./migrations/
 COPY migrations_app.py manage.py ./
 COPY wsgi.py ./
 COPY app/ ./app/
-COPY --chmod=0755 scripts/ /app/scripts/
 
 # FORZAMOS PERMISOS DE EJECUCIÓN
 RUN chmod +x /app/entrypoint.sh /app/healthcheck.sh /app/warp-setup.sh /usr/local/bin/wgcf

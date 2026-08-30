@@ -2,6 +2,7 @@ from flask_restx import Namespace, Resource, fields, reqparse
 from flask import request, current_app
 from app.models import ScrapedURL
 from app.repositories import URLRepository, ChannelRepository
+from app.services.scraper_service import clean_channel_name
 from datetime import datetime, timezone
 from app.tasks.manager import TaskManager
 from urllib.parse import unquote
@@ -49,33 +50,107 @@ class URLList(Resource):
     
     @api.doc('create_url')
     @api.expect(url_input_model)
-    @api.response(201, 'URL created and queued for processing')
+    @api.response(201, 'URL or search created and queued')
     @api.response(409, 'URL already exists')
     @api.response(400, 'Invalid input')
     def post(self):
-        """Add a new URL to scrape."""
-        data = request.json
+        """Add a new URL to scrape or search channels by name."""
+        data = request.json or {}
         
         try:
-            # Check if URL is provided
-            if 'url' not in data or not data['url'].strip():
-                return {'error': 'URL is required'}, 400
+            input_text = data.get('url', '').strip()
+            if not input_text:
+                return {'error': 'URL or search term is required'}, 400
                 
-            # Check if URL type is provided
             url_type = data.get('url_type')
+
+            # ----------------------------------------------------
+            # 1. SI NO ES UNA URL WEB -> MODO BÚSQUEDA DE CANAL
+            # ----------------------------------------------------
+            is_web_url = input_text.startswith(('http://', 'https://', 'ipfs://', 'zeronet://'))
+            
+            if not is_web_url or url_type == 'search':
+                from app.services.acestream_search_service import AcestreamSearchService
+                import asyncio
+                import inspect
+
+                search_service = AcestreamSearchService()
+                
+                # Ejecutar búsqueda (compatible con métodos sync y async)
+                if inspect.iscoroutinefunction(search_service.search):
+                    raw_response = asyncio.run(search_service.search(query=input_text))
+                else:
+                    raw_response = search_service.search(query=input_text)
+
+                # Extraer la lista 'results' del diccionario de respuesta
+                if isinstance(raw_response, dict):
+                    results_list = raw_response.get('results', [])
+                else:
+                    results_list = raw_response or []
+
+                if not results_list:
+                    return {'error': f'No Acestream channels found for query "{input_text}"'}, 404
+
+                # Crear slug para la URL virtual
+                slug = input_text.lower().replace(' ', '-')
+                virtual_url = f"search://{slug}"
+
+                # 1. Guardar la fuente virtual
+                existing = url_repo.get_by_url(virtual_url)
+                if not existing:
+                    url_obj = url_repo.add(virtual_url, 'search')
+                    url_obj.status = 'OK'
+                    url_repo.update(url_obj)
+                else:
+                    url_obj = existing
+
+                # 2. Registrar los canales encontrados en la base de datos
+                added_count = 0
+                seen_ids = set()
+
+                for res in results_list:
+                    if not isinstance(res, dict):
+                        continue
+                        
+                    content_id = res.get('content_id') or res.get('id') or res.get('acestream_id')
+                    raw_name = res.get('name') or input_text
+                    channel_name = clean_channel_name(raw_name)
+                    
+                    # Evitar procesar IDs vacíos o duplicados en el mismo lote
+                    if content_id and content_id not in seen_ids:
+                        seen_ids.add(content_id)
+                        
+                        channel_repo.update_or_create(
+                            channel_id=content_id,
+                            name=channel_name,
+                            source_url=virtual_url,
+                            metadata=res.get('metadata') or {}
+                        )
+                        added_count += 1
+
+                channel_repo.commit()
+
+                return {
+                    'message': f'Search complete. Added {added_count} channels for "{input_text}"',
+                    'url': virtual_url,
+                    'url_type': 'search',
+                    'channels_added': added_count
+                }, 201
+
+            # ----------------------------------------------------
+            # 2. FLUJO NORMAL PARA URLS TRADICIONALES
+            # ----------------------------------------------------
             if not url_type or url_type == 'auto':
                 return {'error': "URL type must be explicitly specified as 'regular' or 'zeronet'"}, 400
             
-            # Check if URL type is valid
             if url_type not in ['regular', 'zeronet']:
                 return {'error': f"Invalid URL type: {url_type}. Must be 'regular' or 'zeronet'"}, 400
             
-            existing = url_repo.get_by_url(data['url'])
+            existing = url_repo.get_by_url(input_text)
             if existing:
                 api.abort(409, 'This URL already exists')
             
-            # Create URL directly using repository method
-            url_obj = url_repo.add(data['url'], url_type)
+            url_obj = url_repo.add(input_text, url_type)
             
             try:
                 task_manager.add_task('scrape_url', url_obj.url)
@@ -87,10 +162,11 @@ class URLList(Resource):
                 'url': url_obj.url,
                 'url_type': url_obj.url_type
             }, 201
+            
         except ValueError as ve:
-            # Handle validation errors
             return {'error': str(ve)}, 400
         except Exception as e:
+            logger.error(f"Error in create_url: {e}", exc_info=True)
             api.abort(500, str(e))
 
 @api.route('/<uuid:id>')

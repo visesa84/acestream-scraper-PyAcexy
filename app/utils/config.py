@@ -12,8 +12,8 @@ class Config:
     # Constantes de clase (Valores por defecto)
     DEFAULT_BASE_URL = 'acestream://'
     DEFAULT_ACE_ENGINE_URL = 'http://localhost:6878'
-    # Fixed background engine check URL (background engine listens on 6879)
-    DEFAULT_ACE_ENGINE_CHECK_URL = 'http://localhost:6879'
+    # Background engine check URL is now obsolete as only the main engine runs.
+    DEFAULT_ACE_ENGINE_CHECK_URL = 'http://localhost:6878'
     DEFAULT_RESCRAPE_INTERVAL = 24
     DEFAULT_CHECKSTATUS_INTERVAL = 24
     DEFAULT_CHECKSTATUS_ENABLED = True

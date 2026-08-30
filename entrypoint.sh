@@ -88,72 +88,9 @@ if [ "$ENABLE_ACESTREAM_ENGINE" = "true" ]; then
     # Use ACESTREAM_HTTP_PORT from env (set in Dockerfile, default: 6878)
     export ACESTREAM_HTTP_PORT=${ACESTREAM_HTTP_PORT:-6878}
 
-    # Determine whether ACEXY_HOST points to an external engine (not local)
-    SKIP_ALL_ENGINES=0
-    if [ -n "${ACEXY_HOST:-}" ] && [ "$ACEXY_HOST" != "localhost" ] && [ "$ACEXY_HOST" != "127.0.0.1" ]; then
-        echo "ACEXY_HOST points to external host ($ACEXY_HOST); will not start any internal engine."
-        SKIP_ALL_ENGINES=1
-        # Stream checks always use localhost:6879 — disable them when engine is external
-        export CHECKSTATUS_ENABLED=false
-        echo "ACEXY_HOST is external; stream status checks disabled (CHECKSTATUS_ENABLED=false)."
-    fi
+	/opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream.log" 2>&1 & 
+	ACESTREAM_PID=$!	
 
-    # Decide startup mode based on CHECKSTATUS_ENABLED env var (default: true)
-    if [ -z "${CHECKSTATUS_ENABLED:-}" ]; then
-        CHECKSTATUS_ENABLED=true
-    fi
-    echo "checkstatus_enabled = $CHECKSTATUS_ENABLED"
-
-    if [ "$CHECKSTATUS_ENABLED" = "false" ] || [ "$CHECKSTATUS_ENABLED" = "0" ]; then
-        START_MODE="main-only"
-    else
-        START_MODE="both"
-    fi
-
-    # Locate bind_remap.so for direct fallback use (in case start_two_engines.sh is absent)
-    SO=""
-    for _so_path in /usr/local/lib/bind_remap.so /app/scripts/bind_remap.so; do
-        [ -f "$_so_path" ] && SO="$_so_path" && break
-    done
-
-    # Start the helper script in appropriate mode
-    if [ "$SKIP_ALL_ENGINES" -eq 1 ]; then
-        echo "Skipping internal Acestream engine startup because configuration points to external engine."
-    else
-        if [ -x "/app/scripts/start_two_engines.sh" ]; then
-            if [ "$START_MODE" = "main-only" ]; then
-                /app/scripts/start_two_engines.sh main-only >> "$LOG_DIR/acestream.log" 2>&1 &
-            else
-                /app/scripts/start_two_engines.sh both >> "$LOG_DIR/acestream.log" 2>&1 &
-            fi
-        else
-            echo "start_two_engines.sh not found or not executable; attempting direct start"
-            if [ "$START_MODE" = "main-only" ]; then
-                /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream.log" 2>&1 &
-                ACESTREAM_PID=$!
-            else
-                # fallback: start two engines manually if we can't use the helper
-                # Main engine starts normally (no remap needed)
-                /opt/acestream/start-engine --client-console --http-port $ACESTREAM_HTTP_PORT $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream_main.log" 2>&1 &
-                PID_MAIN=$!
-                # Background engine starts in a subshell with remap env vars so the
-                # parent process (and gunicorn/pyacexy started later) are NOT affected
-                (
-                    if [ -n "$SO" ]; then
-                        export ACE_BIND_REMAP=1
-                        export ACE_BIND_REMAP_FROM=${ACESTREAM_HTTP_PORT}
-                        export ACE_BIND_REMAP_TO=6879
-                        export ACE_BIND_REMAP_FROM_P2P=8621
-                        export ACE_BIND_REMAP_TO_P2P=8622
-                        export LD_PRELOAD="$SO"
-                    fi
-                    exec /opt/acestream/start-engine --client-console --http-port 6879 $EXTRA_FLAGS --live-buffer $ACEXY_BUFFER_SIZE >> "$LOG_DIR/acestream_background.log" 2>&1
-                ) &
-                PID_BG=$!
-                ACESTREAM_PID=$PID_MAIN
-            fi
-        fi
-    fi
     sleep 3
     echo "Acestream engine startup log: $LOG_DIR/acestream.log"
 fi
