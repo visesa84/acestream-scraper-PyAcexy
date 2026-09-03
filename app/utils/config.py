@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class Config:
     """Configuration management class."""
     # Constantes de clase (Valores por defecto)
-    DEFAULT_BASE_URL = 'acestream://'
+    DEFAULT_BASE_URL = 'http://localhost:8080'
     DEFAULT_ACE_ENGINE_URL = 'http://localhost:6878'
     # Background engine check URL is now obsolete as only the main engine runs.
     DEFAULT_ACE_ENGINE_CHECK_URL = 'http://localhost:6878'

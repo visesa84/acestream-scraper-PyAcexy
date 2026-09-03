@@ -1,8 +1,8 @@
 # --- STAGE 0: Compilación de BoringTun Estable ---
 FROM rust:1.85-slim AS builder
-RUN apt-get update && apt-get install -y pkg-config libssl-dev git && \
-    # Clonamos el repo oficial
-    git clone https://github.com/cloudflare/boringtun.git /src
+RUN apt-get update && apt-get install -y pkg-config libssl-dev curl ca-certificates tar && \
+    mkdir -p /src && \
+    curl -sSL https://github.com/cloudflare/boringtun/archive/refs/heads/master.tar.gz | tar -xz --strip-components=1 -C /src
 
 WORKDIR /src
 
@@ -16,7 +16,7 @@ FROM python:3.10-slim AS base
 
 LABEL maintainer="visesa" \
       description="Base image for Acestream channel scraper with pyacexy" \
-      version="4.4"
+      version="4.5"
 
 WORKDIR /app
 RUN mkdir -p /app/config
@@ -143,7 +143,7 @@ FROM base
 
 # Update metadata labels for the final image
 LABEL description="Acestream channel scraper with ZeroNet support" \
-      version="4.4"
+      version="4.5"
 
 # Copy application files
 COPY --chmod=0755 entrypoint.sh /app/entrypoint.sh

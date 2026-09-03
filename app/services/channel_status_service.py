@@ -3,6 +3,7 @@ import logging
 import aiohttp
 import threading
 from datetime import datetime
+from urllib.parse import urlparse
 from typing import Optional, List, Union, Dict, Any
 from ..models import AcestreamChannel
 from ..extensions import db
@@ -14,18 +15,22 @@ logger = logging.getLogger(__name__)
 class ChannelStatusService:
     def __init__(self):
         config = Config()
-        # Use a dedicated engine URL for checks if configured, otherwise use the main engine
-        self.ace_engine_url = config.ace_engine_check_url
-        # Puerto 8080: Para saber si tú estás viendo el canal
-        self.proxy_url = "/".join(config.base_url.split("/")[:3])
-        self.timeout = aiohttp.ClientTimeout(total=20, connect=5)
+        # Lee la URL configurada por el usuario en la BD
+        raw_url = config.base_url or "http://127.0.0.1:8080"
+
+        # Extrae estrictamente 'esquema://host:puerto' descartando rutas como /ace/getstream?id=
+        parsed = urlparse(raw_url)
+        netloc = parsed.netloc or parsed.path.split('/')[0]
+        self.proxy_url = f"{parsed.scheme or 'http'}://{netloc}"
+        
+        self.timeout = aiohttp.ClientTimeout(total=10, connect=4)
         self._session = None
 
     async def get_session(self):
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession(timeout=self.timeout)
         return self._session
-    
+
     async def close(self):
         if self._session and not self._session.closed:
             await self._session.close()
@@ -35,145 +40,92 @@ class ChannelStatusService:
         
         session = await self.get_session()
         if not session:
-            logger.error("No session available")
             return False
 
         is_online = False
-        is_already_watching = False
-        command_url = None
-        stream_url = None
-        download_speed = 0
         error_msg = "Unknown error"
         check_time = datetime.now()
         
-        try:
-            # 1. PROXY
-            try:
-                status_url = f"{self.proxy_url}/ace/status"
-                async with session.get(status_url, params={'id': channel_id}, timeout=3) as st_resp:
-                    if st_resp.status == 200:
-                        status_data = await st_resp.json() or {}
-                        if status_data.get('clients', 0) > 0:
-                            is_already_watching = True
-                            is_online = True
-            except Exception:
-                pass
-
-            # 2. MOTOR
-            if not is_already_watching:
-                get_url = f"{self.ace_engine_url}/ace/getstream"
-                async with session.get(get_url, params={'id': channel_id, 'format': 'json'}) as response:
-                    data = {}
-                    if response.status == 200:
-                        data = await response.json() or {}
-                    
-                    resp_data = data.get('response') or {} 
-                    stat_url = resp_data.get('stat_url')
-                    command_url = resp_data.get('command_url')
-                    stream_url = resp_data.get('stream_url') or resp_data.get('play_url')
-                    
-                    if stat_url:
-                        for attempt in range(10):
-                            await asyncio.sleep(min(1 + attempt, 5))
-                            async with session.get(stat_url) as s_resp:
-                                if s_resp.status == 200:
-                                    s_data = await s_resp.json() or {}
-                                    res_obj = s_data.get('response') or {}
-                                    download_speed = float(res_obj.get('speed_down', 0))
-                                    peers = int(res_obj.get('peers', 0))
-                                    if download_speed > 0 or peers > 0:
-                                        is_online = True
-                                        break
-                        if not is_online and stream_url:
-                            try:
-                                headers = {'Range': 'bytes=0-4095'}
-                                async with session.get(stream_url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as r:
-                                    if r.status in (200, 206):
-                                        content = await r.content.read(4096)
-                                        if len(content) >= 4096:
-                                            is_online = True
-                            except Exception:
-                                pass
-                        if not is_online:
-                            error_msg = f"Speed 0 after {attempt+1} attempts"
-                    else:
-                        error_msg = data.get('error', "No stat_url")
-                        
-        except Exception as e:
-            logger.error(f"Error checking {channel_id}: {e}")
-            error_msg = str(e)
+        stream_url = f"{self.proxy_url}/ace/getstream"
+        headers = {'Range': 'bytes=0-4095'}
         
-        finally:
-            if command_url and not is_already_watching:
-                try:
-                    from urllib.parse import urlparse, urlencode, parse_qsl, urlunparse
-                    _parsed = urlparse(command_url)
-                    _params = dict(parse_qsl(_parsed.query))
-                    _params['method'] = 'stop'
-                    _stop_url = urlunparse(_parsed._replace(query=urlencode(_params)))
-                    async with session.get(_stop_url, timeout=2) as r:
-                        await r.release()
-                except Exception:
-                    pass
+        try:
+            # allow_redirects=False evita que aiohttp falle al intentar seguir esquemas acestream://
+            async with session.get(
+                stream_url, 
+                params={'id': channel_id}, 
+                headers=headers, 
+                timeout=aiohttp.ClientTimeout(total=8),
+                allow_redirects=False
+            ) as response:
+                # Transmisión de bytes directa
+                if response.status in (200, 206):
+                    content = await response.content.read(4096)
+                    if len(content) >= 1024:
+                        is_online = True
+                    else:
+                        error_msg = "Stream delivered insufficient or empty data"
+                # Redirección de Acexy (indica que el stream fue resuelto correctamente)
+                elif response.status in (301, 302, 303, 307, 308):
+                    is_online = True
+                else:
+                    error_msg = f"HTTP Error {response.status} from Acexy"
 
-        # 3. DB
+        except asyncio.TimeoutError:
+            error_msg = "Timeout waiting for Acexy buffer"
+        except Exception as e:
+            logger.error(f"Error checking {channel_id} via Acexy: {e}")
+            error_msg = str(e)
+
+        # Actualización en Base de Datos
         try:
             with current_app.app_context():
                 db_channel = db.session.get(AcestreamChannel, channel_id)
                 if db_channel:
-
                     db_channel.is_online = is_online
                     db_channel.last_processed = check_time
                     db_channel.last_checked = check_time
-                    if is_online:
-                        db_channel.check_error = None
-                    else:
-                        db_channel.check_error = error_msg
+                    db_channel.check_error = None if is_online else error_msg
                         
-                    logger.info(f"[{'ONLINE' if is_online else 'OFFLINE'}] {channel_id} | {download_speed} KB/s")
+                    logger.info(f"[{'ONLINE' if is_online else 'OFFLINE'}] {channel_id}")
                     db.session.commit()
-                    
         except Exception as db_e:
             logger.error(f"DB Error: {db_e}")
             
         return is_online
 
     async def check_channels(self, channels: List[AcestreamChannel]):
-        """Procesa canales de 2 en 2 con escalonamiento dinámico"""
+        """Procesa canales en lotes de 2 conservando el tiempo original"""
         channel_ids = [c.id for c in channels]
         semaphore = asyncio.Semaphore(2)
         
         async def sem_task(cid, delay):
-            # El escalonamiento ayuda a que el motor no colapse al inicio
             await asyncio.sleep(delay)
             async with semaphore:
                 return await self.check_channel(cid)
 
-        # Procesamos por parejas
-        for i in range(0, len(channel_ids), 2):
+        total = len(channel_ids)
+        for i in range(0, total, 2):
+            from ..utils.config import Config
+            if not Config().checkstatus_enabled:
+                logger.info("Stopping checking status: The user has deactivated it.")
+                break
+
             batch = channel_ids[i:i+2]
             tasks = []
             
             for idx, cid in enumerate(batch):
-                # El 1º sale al seg 0, el 2º sale al seg 4 para dejar espacio al motor
-                delay = idx * 4 
+                delay = idx * 4  # Escalonamiento de 4 segundos por canal
                 tasks.append(asyncio.create_task(sem_task(cid, delay)))
             
-            # Esperamos a que la pareja termine sus chequeos
             await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # Pausa de recuperación tras cerrar ambos streams
-            await asyncio.sleep(3)
+            await asyncio.sleep(3) # Pausa de 3 segundos tras cada lote
         
         await self.close()
 
 async def check_channel_status(channel_id_or_obj: Union[str, AcestreamChannel, Dict[str, Any]]) -> dict:
-    """
-    Check status of a single channel.
-    """
     from flask import current_app
     
-    # 1. Extraer el ID del canal
     channel_id = None
     channel_name = None
     
@@ -189,21 +141,15 @@ async def check_channel_status(channel_id_or_obj: Union[str, AcestreamChannel, D
     if not channel_id:
         raise ValueError("Missing channel ID")
         
-    # 2. Inicializar el servicio
-    service = ChannelStatusService()
-    is_online = False
-    
-    try:
-        with current_app.app_context():
+    with current_app.app_context():
+        service = ChannelStatusService()
+        try:
             repo = ChannelRepository()
             channel = repo.get_by_id(channel_id)
             if not channel:
                 raise ValueError(f"Channel {channel_id} not found")
                 
-            # 3. Realizar el chequeo asíncrono
             is_online = await service.check_channel(channel_id)
-            
-            # Recargar para obtener datos frescos tras el commit del servicio
             updated_channel = repo.get_by_id(channel_id)
             
             return {
@@ -214,11 +160,9 @@ async def check_channel_status(channel_id_or_obj: Union[str, AcestreamChannel, D
                 'last_checked': updated_channel.last_checked,
                 'error': updated_channel.check_error
             }
-    finally:
-        # 4. LIMPIEZA OBLIGATORIA: Cerramos la sesión de aiohttp del servicio
-        await service.close()
+        finally:
+            await service.close()
 
-# Bloqueo global para este módulo
 _status_lock = threading.Lock()
 _is_running = False
 
@@ -226,7 +170,6 @@ def start_background_check(channels, manager=None):
     global _is_running
     from flask import current_app
     
-    # Bloqueo atómico para evitar doble hilo
     with _status_lock:
         if _is_running:
             logger.warning("Attempted duplicate execution aborted.")
@@ -238,34 +181,22 @@ def start_background_check(channels, manager=None):
 
     app = current_app._get_current_object()
     channel_ids = [c.id for c in channels]
-    total = len(channel_ids)
 
     async def run_checks():
         global _is_running
         try:
-            from .channel_status_service import ChannelStatusService
-            service = ChannelStatusService()
-            batch_size = 2
-            
-            # Procesamos de 2 en 2
-            for i in range(0, len(channel_ids), batch_size):
-                from ..utils.config import Config
-                if not Config().checkstatus_enabled:
-                    logger.info("Stopping checking status: The user has deactivated it.")
-                    break
-                batch_ids = channel_ids[i:i + batch_size]
-                with app.app_context():
-                    # RE-CONSULTA: Vital para evitar el error de SQLite de hilos
-                    batch = db.session.query(AcestreamChannel).filter(AcestreamChannel.id.in_(batch_ids)).all()
-                    if batch:
-                        logger.info(f"Processing pair: {i+1}-{min(i+batch_size, total)} of {total}")
-                        await service.check_channels(batch)
-                        
-                        db.session.commit()
-                        db.session.expunge_all() # Saca los objetos de la RAM
-                        db.session.remove()      # Cierra la sesión de este hilo/contexto
-                await asyncio.sleep(1)
+            # CLAVE: Instanciar dentro de app_context para que lea la BD correctamente
+            with app.app_context():
+                service = ChannelStatusService()
+                
+                db_channels = db.session.query(AcestreamChannel).filter(AcestreamChannel.id.in_(channel_ids)).all()
+                if db_channels:
+                    await service.check_channels(db_channels)
+        except Exception as e:
+            logger.error(f"Error in background execution: {e}")
         finally:
+            with app.app_context():
+                db.session.remove()
             with _status_lock:
                 _is_running = False
             if manager:
@@ -275,9 +206,18 @@ def start_background_check(channels, manager=None):
     def run_thread():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        try: loop.run_until_complete(run_checks())
-        finally: loop.close()
-        import gc
-        gc.collect() # Limpia la RAM al morir el bucle asyncio
+        try: 
+            loop.run_until_complete(run_checks())
+        finally: 
+            loop.close()
+            import gc
+            gc.collect()
 
-    threading.Thread(target=run_thread, daemon=True, name="StatusCheckThread").start()
+    try:
+        threading.Thread(target=run_thread, daemon=True, name="StatusCheckThread").start()
+    except Exception as e:
+        with _status_lock:
+            _is_running = False
+        if manager:
+            manager.is_checking_status = False
+        logger.error(f"Failed to start thread: {e}")
