@@ -197,6 +197,70 @@ class AcestreamSearchService:
                 }
             }
     
+    def search_all_pages(self, query: str = "", page_size: int = 100, category: str = "", max_pages: int = 10) -> Dict[str, Any]:
+        """Barrido masivo de todas las páginas para URL Management."""
+        all_processed_results = []
+        seen_ids = set()
+        current_page = 1
+        total_pages = 1
+        
+        while current_page <= total_pages and current_page <= max_pages:
+            try:
+                search_url = f"{self.engine_url}/search"
+                api_page = current_page - 1
+                
+                params = {'query': query, 'page': api_page, 'page_size': page_size}
+                if category:
+                    params['category'] = category
+                
+                response = requests.get(search_url, params=params, timeout=10)
+                if response.status_code != 200:
+                    break
+                    
+                search_data = response.json()
+                api_result = search_data.get('result', {})
+                raw_results = api_result.get('results', [])
+                total_results = api_result.get('total', 0)
+                
+                if total_results > 0 and page_size > 0:
+                    total_pages = (total_results + page_size - 1) // page_size
+
+                for result in raw_results:
+                    if 'items' in result and isinstance(result['items'], list) and len(result['items']) > 0:
+                        for item in result['items']:
+                            content_id = self.get_content_id(item.get('infohash'))
+                            if content_id and content_id not in seen_ids:
+                                seen_ids.add(content_id)
+                                processed_item = {
+                                    'name': result.get('name', 'Unnamed Channel'),
+                                    'id': content_id,
+                                    'categories': item.get('categories', []),
+                                    'bitrate': item.get('bitrate', 0)
+                                }
+                                for key, value in item.items():
+                                    if key not in processed_item:
+                                        processed_item[key] = value
+                                all_processed_results.append(processed_item)
+                    else:
+                        result_id = result.get('infohash', result.get('id', ''))
+                        if result_id:
+                            content_id = self.get_content_id(result_id) if len(result_id) != 40 else result_id
+                            if content_id and content_id not in seen_ids:
+                                seen_ids.add(content_id)
+                                result['id'] = content_id
+                                all_processed_results.append(result)
+
+                current_page += 1
+            except Exception as e:
+                logger.error(f"Error reading page {current_page}: {e}")
+                break
+
+        return {
+            'success': True,
+            'message': 'Deep search completed',
+            'results': all_processed_results
+        }
+    
     def extract_acestream_id(self, url: str) -> Optional[str]:
         """
         Extract acestream ID from a URL.

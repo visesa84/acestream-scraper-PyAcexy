@@ -1,6 +1,7 @@
 from flask_restx import Namespace, Resource, fields, reqparse
 from flask import request, current_app
-from app.models import ScrapedURL
+from app.extensions import db
+from app.models import ScrapedURL, BlacklistedChannel
 from app.repositories import URLRepository, ChannelRepository
 from app.services.scraper_service import clean_channel_name
 from datetime import datetime, timezone
@@ -76,13 +77,12 @@ class URLList(Resource):
 
                 search_service = AcestreamSearchService()
                 
-                # Ejecutar búsqueda (compatible con métodos sync y async)
-                if inspect.iscoroutinefunction(search_service.search):
-                    raw_response = asyncio.run(search_service.search(query=input_text))
+                # Ejecutar barrido masivo con search_all_pages
+                if inspect.iscoroutinefunction(search_service.search_all_pages):
+                    raw_response = asyncio.run(search_service.search_all_pages(query=input_text))
                 else:
-                    raw_response = search_service.search(query=input_text)
+                    raw_response = search_service.search_all_pages(query=input_text)
 
-                # Extraer la lista 'results' del diccionario de respuesta
                 if isinstance(raw_response, dict):
                     results_list = raw_response.get('results', [])
                 else:
@@ -95,7 +95,7 @@ class URLList(Resource):
                 slug = input_text.lower().replace(' ', '-')
                 virtual_url = f"search://{slug}"
 
-                # 1. Guardar la fuente virtual
+                # Guardar la fuente virtual
                 existing = url_repo.get_by_url(virtual_url)
                 if not existing:
                     url_obj = url_repo.add(virtual_url, 'search')
@@ -104,37 +104,56 @@ class URLList(Resource):
                 else:
                     url_obj = existing
 
-                # 2. Registrar los canales encontrados en la base de datos
+                # Traer patrones de la Blacklist Global
+                blacklist_patterns = [b.pattern.lower().strip() for b in BlacklistedChannel.query.all()]
+
                 added_count = 0
+                ignored_count = 0
                 seen_ids = set()
 
-                for res in results_list:
-                    if not isinstance(res, dict):
-                        continue
+                # --- DESACTIVAR AUTOFLUSH TEMPORALMENTE (EVITA IntegrityError) ---
+                with db.session.no_autoflush:
+                    for res in results_list:
+                        if not isinstance(res, dict):
+                            continue
+                            
+                        content_id = res.get('content_id') or res.get('id') or res.get('acestream_id')
+                        raw_name = res.get('name') or input_text
+                        channel_name = clean_channel_name(raw_name)
                         
-                    content_id = res.get('content_id') or res.get('id') or res.get('acestream_id')
-                    raw_name = res.get('name') or input_text
-                    channel_name = clean_channel_name(raw_name)
-                    
-                    # Evitar procesar IDs vacíos o duplicados en el mismo lote
-                    if content_id and content_id not in seen_ids:
-                        seen_ids.add(content_id)
-                        
-                        channel_repo.update_or_create(
-                            channel_id=content_id,
-                            name=channel_name,
-                            source_url=virtual_url,
-                            metadata=res.get('metadata') or {}
-                        )
-                        added_count += 1
+                        if content_id and content_id not in seen_ids:
+                            name_lower = channel_name.lower().strip()
+                            id_lower = content_id.lower().strip()
+
+                            # Filtrado de Blacklist Global
+                            is_blacklisted = any(
+                                pattern in name_lower or pattern in id_lower 
+                                for pattern in blacklist_patterns
+                            )
+
+                            if is_blacklisted:
+                                logger.info(f"[Blacklist] Skipping channel: '{channel_name}' (ID: {content_id})")
+                                ignored_count += 1
+                                continue
+
+                            seen_ids.add(content_id)
+                            
+                            channel_repo.update_or_create(
+                                channel_id=content_id,
+                                name=channel_name,
+                                source_url=virtual_url,
+                                metadata=res.get('metadata') or {}
+                            )
+                            added_count += 1
 
                 channel_repo.commit()
 
                 return {
-                    'message': f'Search complete. Added {added_count} channels for "{input_text}"',
+                    'message': f'Search complete. Added {added_count} channels ({ignored_count} ignored by blacklist) for "{input_text}"',
                     'url': virtual_url,
                     'url_type': 'search',
-                    'channels_added': added_count
+                    'channels_added': added_count,
+                    'channels_ignored': ignored_count
                 }, 201
 
             # ----------------------------------------------------
@@ -230,7 +249,6 @@ class URLItem(Resource):
                 logger.warning(f"URL not found for deletion: ID {id}")
                 api.abort(404, 'URL not found')
             
-            # Store the URL for channel deletion
             url_to_delete = url_obj.url
             
             if not channel_repo.delete_by_source(url_to_delete):
@@ -274,7 +292,6 @@ class URLRefresh(Resource):
         except Exception as e:
             api.abort(500, str(e))
 
-# Keep the old path-based endpoints for backward compatibility
 @api.route('/<path:url>/details')
 @api.param('url', 'The URL string to manage')
 class URLItemByUrl(Resource):
@@ -327,20 +344,16 @@ class URLRefreshAll(Resource):
     def post(self):
         """Refresca todas las URLs habilitadas de una vez."""
         try:
-            # 1. Obtener todas las URLs habilitadas
             enabled_urls = ScrapedURL.query.filter_by(enabled=True).all()
             
             urls_to_process = []
             for url_obj in enabled_urls:
-                # 2. Marcar como 'processing' para que el polling de JS las detecte
                 url_obj.status = 'processing'
                 url_repo.update(url_obj)
                 
-                # 3. Enviar a la cola de tareas
                 task_manager.add_task('scrape_url', url_obj.url)
                 urls_to_process.append(url_obj.url)
             
-            # Este es el formato que espera tu JS: { success, data: { message, urls: [] } }
             return {
                 'message': f'Refresh started for {len(urls_to_process)} URLs',
                 'urls': urls_to_process
